@@ -1,0 +1,380 @@
+/* Coupon Hunter on-page card.
+   Apple / Cal AI aesthetic: clean white surface, big soft corners, gentle
+   shadow, rounded friendly type, pill rows, black pill primary button. */
+
+#cohunt-card {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 340px;
+  max-height: 78vh;
+  z-index: 2147483647;
+  background: #ffffff;
+  color: #1c1c1e;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 24px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 12px 32px rgba(0, 0, 0, 0.12),
+    0 32px 64px rgba(0, 0, 0, 0.10);
+  font-family: ui-rounded, "SF Pro Rounded", "SF Pro Display", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  animation: cohunt-pop 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes cohunt-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+#cohunt-card * {
+  box-sizing: border-box;
+}
+
+.cohunt-card-inner {
+  display: flex;
+  flex-direction: column;
+  max-height: 78vh;
+  padding: 6px;
+}
+
+/* -------- Header -------- */
+.cohunt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 8px;
+}
+
+.cohunt-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  color: #1c1c1e;
+}
+
+.cohunt-spark {
+  font-size: 15px;
+  background: linear-gradient(135deg, #b14bf4 0%, #2383e2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.cohunt-close {
+  border: none;
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.45);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms, color 120ms;
+}
+.cohunt-close:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #1c1c1e;
+}
+
+/* -------- Stats header -------- */
+.cohunt-stats {
+  display: flex;
+  gap: 8px;
+  margin: 2px 6px 10px;
+}
+
+.cohunt-stat {
+  flex: 1;
+  background: #f5f5f7;
+  border-radius: 16px;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.cohunt-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #1c1c1e;
+  line-height: 1.1;
+}
+.cohunt-stat-value.cohunt-saved {
+  color: #19a463; /* friendly green for money saved */
+}
+
+.cohunt-stat-label {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* -------- Meta / status -------- */
+.cohunt-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 8px;
+  flex-wrap: wrap;
+}
+
+.cohunt-domain {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1c1c1e;
+  background: #f5f5f7;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.cohunt-status {
+  font-size: 12.5px;
+  color: rgba(0, 0, 0, 0.5);
+  flex: 1;
+  min-width: 0;
+}
+
+/* -------- Coupon list -------- */
+.cohunt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 64px;
+}
+.cohunt-list::-webkit-scrollbar {
+  width: 8px;
+}
+.cohunt-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.14);
+  border-radius: 8px;
+}
+
+.cohunt-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 14px;
+  transition: background 120ms;
+}
+.cohunt-item:hover {
+  background: #f7f7f8;
+}
+
+.cohunt-code {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+    monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: #f0f0f2;
+  color: #1c1c1e;
+  padding: 4px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: all;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  justify-self: start;
+  transition: background 120ms;
+}
+.cohunt-code:hover {
+  background: #e7e7ea;
+}
+
+.cohunt-source {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.cohunt-state {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+  min-width: 54px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cohunt-working .cohunt-state {
+  color: #19a463;
+}
+.cohunt-failed .cohunt-state {
+  color: rgba(0, 0, 0, 0.45);
+}
+.cohunt-trying .cohunt-state {
+  color: #2383e2;
+}
+.cohunt-failed .cohunt-code {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.cohunt-working .cohunt-code {
+  background: rgba(25, 164, 99, 0.12);
+  color: #137c4b;
+}
+
+.cohunt-empty {
+  padding: 22px 12px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+/* -------- Footer -------- */
+.cohunt-foot {
+  display: flex;
+  gap: 8px;
+  padding: 10px 6px 6px;
+}
+
+.cohunt-apply {
+  flex: 1;
+  background: #1c1c1e;
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 13px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 120ms, background 120ms, box-shadow 120ms;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.cohunt-apply:hover {
+  background: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+.cohunt-apply:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.cohunt-refresh {
+  background: #f0f0f2;
+  color: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 999px;
+  width: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.cohunt-refresh:hover {
+  background: #e7e7ea;
+  color: #1c1c1e;
+}
+
+/* -------- Dark mode (Cal AI dark surfaces) -------- */
+@media (prefers-color-scheme: dark) {
+  #cohunt-card {
+    background: #1c1c1e;
+    color: #f5f5f7;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 16px 40px rgba(0, 0, 0, 0.55);
+  }
+  .cohunt-brand {
+    color: #ffffff;
+  }
+  .cohunt-close {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .cohunt-close:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+  }
+  .cohunt-stat,
+  .cohunt-domain {
+    background: #2c2c2e;
+  }
+  .cohunt-stat-value {
+    color: #ffffff;
+  }
+  .cohunt-stat-value.cohunt-saved {
+    color: #34d27b;
+  }
+  .cohunt-stat-label,
+  .cohunt-status {
+    color: rgba(255, 255, 255, 0.55);
+  }
+  /* These inherited black light-mode colors before — invisible on dark. */
+  .cohunt-source {
+    color: rgba(255, 255, 255, 0.58);
+  }
+  .cohunt-state {
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .cohunt-failed .cohunt-state {
+    color: rgba(255, 255, 255, 0.42);
+  }
+  .cohunt-domain {
+    color: #f5f5f7;
+  }
+  .cohunt-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .cohunt-code {
+    background: rgba(255, 255, 255, 0.09);
+    color: #f5f5f7;
+  }
+  .cohunt-code:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .cohunt-working .cohunt-code {
+    background: rgba(52, 210, 123, 0.16);
+    color: #5fe39b;
+  }
+  .cohunt-working .cohunt-state {
+    color: #34d27b;
+  }
+  .cohunt-apply {
+    background: #ffffff;
+    color: #1c1c1e;
+  }
+  .cohunt-apply:hover {
+    background: #f0f0f2;
+  }
+  .cohunt-refresh {
+    background: #2c2c2e;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .cohunt-refresh:hover {
+    background: #3a3a3c;
+    color: #ffffff;
+  }
+}

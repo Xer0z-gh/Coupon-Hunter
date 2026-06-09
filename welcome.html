@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome to Coupon Hunter</title>
+    <style>
+      :root {
+        --ink: #1c1c1e;
+        --muted: rgba(0, 0, 0, 0.55);
+        --line: rgba(0, 0, 0, 0.08);
+        --grad: linear-gradient(135deg, #b14bf4 0%, #2383e2 100%);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(1200px 600px at 50% -10%, #f3f0ff 0%, #ffffff 55%);
+        color: var(--ink);
+        font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "Inter", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        justify-content: center;
+        padding: 64px 24px;
+      }
+      .wrap { width: 100%; max-width: 620px; }
+      .brand {
+        display: flex; align-items: center; gap: 10px;
+        font-weight: 800; font-size: 20px; letter-spacing: -0.02em;
+      }
+      .spark {
+        background: var(--grad); -webkit-background-clip: text;
+        background-clip: text; -webkit-text-fill-color: transparent; font-size: 22px;
+      }
+      h1 { font-size: 40px; letter-spacing: -0.035em; margin: 28px 0 10px; line-height: 1.08; }
+      .lede { font-size: 18px; color: var(--muted); margin: 0 0 8px; line-height: 1.5; }
+      .free {
+        display: inline-block; margin-top: 14px; padding: 6px 14px; border-radius: 999px;
+        background: #eafaf1; color: #137c4b; font-weight: 700; font-size: 13px;
+        border: 1px solid rgba(25, 164, 99, 0.2);
+      }
+      .steps { margin: 36px 0; display: grid; gap: 14px; }
+      .step {
+        display: flex; gap: 14px; align-items: flex-start;
+        background: #fff; border: 1px solid var(--line); border-radius: 18px;
+        padding: 18px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 10px 30px rgba(0,0,0,0.05);
+      }
+      .num {
+        flex: none; width: 30px; height: 30px; border-radius: 50%;
+        background: var(--ink); color: #fff; font-weight: 700; font-size: 14px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .step h3 { margin: 2px 0 4px; font-size: 16px; letter-spacing: -0.01em; }
+      .step p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+      .cta {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: var(--ink); color: #fff; border: none; cursor: pointer;
+        border-radius: 999px; padding: 14px 26px; font-size: 16px; font-weight: 700;
+        font-family: inherit; box-shadow: 0 6px 18px rgba(0,0,0,0.16);
+      }
+      .cta:hover { background: #000; }
+      .foot { margin-top: 28px; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+      .foot a { color: #2383e2; text-decoration: none; }
+      .priv {
+        margin-top: 16px; padding: 16px 18px; border-radius: 16px;
+        background: #f7f7f8; font-size: 13.5px; color: var(--muted); line-height: 1.55;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="brand"><span class="spark">✦</span> Coupon Hunter</div>
+
+      <h1>Never overpay at checkout again.</h1>
+      <p class="lede">
+        Coupon Hunter scans the web for working coupon codes, tries them for you,
+        and keeps the one that saves the most — automatically.
+      </p>
+      <span class="free">100% free &amp; open source — forever</span>
+
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <div>
+            <h3>Shop like normal</h3>
+            <p>Add things to your cart and head to checkout on any store. No setup.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <div>
+            <h3>We find &amp; test the codes</h3>
+            <p>
+              The moment a discount box appears, Coupon Hunter hunts 20+ coupon
+              databases (plus codes the store itself advertises) for that exact shop.
+            </p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <div>
+            <h3>The best code gets applied</h3>
+            <p>
+              It tries each code, watches your total drop, and keeps the biggest
+              discount. You just check out — and see how much you saved.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button class="cta" id="done"><span class="spark">✦</span> Start saving</button>
+
+      <div class="priv">
+        <b>Your privacy:</b> Coupon Hunter runs entirely in your browser. It doesn't
+        have accounts, doesn't track you, and never sends your cart, payment details,
+        or browsing history anywhere. Coupon lookups fetch public coupon pages for the
+        store you're on — nothing more.
+      </div>
+
+      <div class="foot">
+        Open source under the MIT license. Found a bug or a store it misses?
+        <a id="gh" href="https://github.com/Xer0z-gh/coupon-hunter" target="_blank" rel="noopener">Contribute on GitHub</a>.
+      </div>
+    </div>
+
+    <script src="welcome.js"></script>
+  </body>
+</html>
