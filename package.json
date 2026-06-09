@@ -1,0 +1,13 @@
+{
+  "name": "coupon-hunter",
+  "version": "1.0.0",
+  "description": "Free & open-source browser extension that finds working coupon codes for any store and auto-applies the best one at checkout.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check background.js && node --check sources.js && node --check content.js && node --check core.js && node --check popup.js"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Xer0z-gh/coupon-hunter"
+}

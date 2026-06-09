@@ -32,24 +32,58 @@ async function init() {
   try {
     host = new URL(tab.url).hostname;
   } catch {}
-  state.domain = rootDomain(host) || "unknown.shop";
-  $("heroDomain").textContent = state.domain;
+  const fallback = rootDomain(host) || "unknown.shop";
+
+  // Ask the content script which store this page actually resolves to (handles
+  // hosted checkouts like Shop Pay / Stripe). Fall back to the tab host.
+  const resolved = await resolveTabDomain(state.tabId);
+  if (resolved && resolved.domain) {
+    state.domain = resolved.domain;
+  } else if (resolved && resolved.pos) {
+    state.domain = null; // hosted checkout we can't attribute — don't hunt
+    state.unresolvedPos = true;
+  } else {
+    state.domain = fallback;
+  }
+
+  $("heroDomain").textContent =
+    state.domain || (host ? host.replace(/^www\./, "") : "this checkout");
+  if (state.unresolvedPos) {
+    setHeroPrompt("Hosted checkout — open the store's own site to find its coupons.");
+  }
 
   // Load any cached codes immediately.
-  chrome.runtime.sendMessage(
-    { type: "get-cached", domain: state.domain },
-    (res) => {
-      if (res?.ok && res.codes?.length) {
-        state.codes = res.codes;
-        renderCodes();
-        setMeta(`${res.codes.length} cached`);
+  if (state.domain) {
+    chrome.runtime.sendMessage(
+      { type: "get-cached", domain: state.domain },
+      (res) => {
+        if (res?.ok && res.codes?.length) {
+          state.codes = res.codes;
+          renderCodes();
+          setMeta(`${res.codes.length} cached`);
+        }
       }
-    }
-  );
+    );
+  }
 
   loadSavings();
   loadSiteState();
   await loadSettings();
+}
+
+// Query the active tab's content script for the resolved merchant domain.
+function resolveTabDomain(tabId) {
+  return new Promise((resolve) => {
+    if (!tabId) return resolve(null);
+    try {
+      chrome.tabs.sendMessage(tabId, { type: "cohunt:get-domain" }, (res) => {
+        if (chrome.runtime.lastError) return resolve(null);
+        resolve(res || null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
 }
 
 // -- Lifetime savings dashboard ---------------------------------------------
@@ -65,6 +99,7 @@ function loadSavings() {
 // -- Enabled / per-site pause -----------------------------------------------
 function loadSiteState() {
   $("pauseDomain").textContent = state.domain || "this site";
+  if (!state.domain) return;
   chrome.runtime.sendMessage(
     { type: "get-site-state", domain: state.domain },
     (res) => {
@@ -197,6 +232,10 @@ function setHeroPrompt(text) {
 
 // -- Hunt orchestration -----------------------------------------------------
 function startHunt(force = false) {
+  if (!state.domain) {
+    setMeta("No store detected on this page.");
+    return;
+  }
   state.codes = [];
   state.attempted.clear();
   state.sourcesSeen = new Map();

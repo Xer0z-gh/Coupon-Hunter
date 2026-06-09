@@ -10,68 +10,31 @@
   if (window.__couponHunterLoaded) return;
   window.__couponHunterLoaded = true;
 
-  // Normalise any hostname down to its registrable root (handles common
-  // two-label ccTLDs like .co.uk).
-  function rootDomainOf(host) {
-    if (!host) return "";
-    const h = host.toLowerCase().replace(/^www\./, "");
-    const parts = h.split(".");
-    if (parts.length < 3) return h;
-    const last2 = parts.slice(-2).join(".");
-    const last3 = parts.slice(-3).join(".");
-    return /\.(co|com|org|gov|ac|net)\.[a-z]{2}$/.test(h) ? last3 : last2;
-  }
+  // Pure, unit-tested logic lives in core.js (loaded as the first content
+  // script). Alias what we use so the rest of this file reads unchanged.
+  const CHCore = globalThis.CHCore;
+  const {
+    rootDomainOf,
+    isPOS,
+    isGoodCode,
+    mergeCodes,
+    parseMoney,
+    classifyResultText,
+    classifyButtonLabel,
+    isDangerButtonText,
+    potentialFromCode,
+    ceilSavings,
+  } = CHCore;
   const rootDomain = rootDomainOf(location.hostname);
 
   // -- Third-party checkout / POS detection -----------------------------------
   // On hosted checkouts (Shop Pay, Stripe, PayPal, Square, Klarna, etc.) the
-  // page's own domain is the PROCESSOR, not the store. Hunting it returns
-  // another shop's junk (the shop.app bug), so we resolve the REAL merchant the
-  // cart belongs to and hunt + apply for that domain only.
-  const POS_HOSTS = new Set([
-    "shop.app", "shopify.com", "myshopify.com", "checkout.shopify.com",
-    "checkout.stripe.com", "pay.stripe.com", "buy.stripe.com", "js.stripe.com",
-    "pay.google.com", "googlepay.com", "paypal.com", "paypalobjects.com",
-    "squareup.com", "square.site", "checkout.square.site", "bolt.com",
-    "fast.co", "checkout.com", "link.com", "afterpay.com", "klarna.com",
-    "sezzle.com", "affirm.com", "global-e.com", "digitalriver.com",
-    "fastspring.com", "recurly.com", "chargebee.com", "snipcart.com",
-    "amazonpay.com", "braintreegateway.com", "adyen.com",
-  ]);
-  // Domains that are never the merchant (infra / analytics / CDNs / the user).
-  const IGNORE_DOMAINS = new Set([
-    "google.com", "gstatic.com", "googleapis.com", "googletagmanager.com",
-    "google-analytics.com", "doubleclick.net", "facebook.com", "fbcdn.net",
-    "cloudflare.com", "cloudfront.net", "jsdelivr.net", "unpkg.com", "w3.org",
-    "schema.org", "gmail.com", "googleusercontent.com", "shopifycdn.com",
-    "shopifysvc.com", "recaptcha.net", "cdninstagram.com", "twitter.com",
-    "x.com", "youtube.com", "apple.com", "bing.com", "microsoft.com",
-    "licdn.com", "tiktok.com", "klaviyo.com", "hotjar.com", "sentry.io",
-    "cookielaw.org", "onetrust.com",
-  ]);
-
-  function isPOS(host) {
-    if (!host) return false;
-    host = host.toLowerCase().replace(/^www\./, "");
-    return POS_HOSTS.has(host) || POS_HOSTS.has(rootDomainOf(host));
-  }
-
-  // When the referrer can't tell us the store, scan the page for the most
-  // frequently-referenced outbound domain that isn't infra or a processor.
+  // page's own domain is the PROCESSOR, not the store. We resolve the REAL
+  // merchant the cart belongs to and hunt + apply for that domain only.
   function guessMerchantFromPage() {
-    const html = document.documentElement.outerHTML || "";
-    const re = /https?:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi;
-    const counts = new Map();
-    let m;
-    while ((m = re.exec(html)) !== null) {
-      const root = rootDomainOf(m[1]);
-      if (!root || root.split(".").length < 2) continue;
-      if (isPOS(root) || IGNORE_DOMAINS.has(root)) continue;
-      counts.set(root, (counts.get(root) || 0) + 1);
-    }
-    let best = null, n = 0;
-    for (const [d, c] of counts) if (c > n) { n = c; best = d; }
-    return n >= 2 ? best : null; // require a couple of mentions to trust it
+    return CHCore.guessMerchantFromHtml(
+      document.documentElement.outerHTML || ""
+    );
   }
 
   // The store domain we hunt + apply codes for. Returns null on a POS page we
@@ -138,6 +101,15 @@
     return list.includes(domain) || list.includes(rootDomain);
   }
 
+  // Let the popup ask which store this page resolves to, so it shows the same
+  // merchant the on-page card uses — even behind a hosted checkout.
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg?.type !== "cohunt:get-domain") return;
+    const m = huntDomain || resolveMerchant();
+    sendResponse({ domain: m || null, pos: isPOS(location.hostname) });
+    return true;
+  });
+
   // -- Selectors --------------------------------------------------------------
   const COUPON_INPUT_SELECTORS = [
     'input[name*="coupon" i]',
@@ -170,82 +142,29 @@
     '[id*="order-total" i]',
   ];
 
-  // -- Code validation / dedupe / on-page scan --------------------------------
-  // Reject the junk we saw in the wild: numeric offer IDs (16580828), repeats,
-  // and obvious UI words. A real code has letters and isn't a pure number.
-  const CONTENT_BLOCKLIST = new Set([
-    "CHECKOUT", "SHIPPING", "DISCOUNT", "COUPON", "PROMO", "SUBTOTAL",
-    "PAYMENT", "BILLING", "ADDRESS", "EXPRESS", "COMPANY", "OPTIONAL",
-    "ENGLISH", "COUNTRY", "FREE", "GIFT", "CARD", "CODE", "EMAIL", "PHONE",
-    "APPLY", "ORDER", "TOTAL", "PRICE", "ITEMS", "STORE", "RETURN", "POLICY",
-    "TERMS", "SUBMIT", "CANCEL", "SEARCH", "ACCOUNT", "REDEEM", "REMOVE",
-  ]);
-  function isGoodCode(raw) {
-    const s = String(raw || "").toUpperCase().trim();
-    if (s.length < 4 || s.length > 20) return false;
-    if (!/^[A-Z0-9]+$/.test(s)) return false;
-    if (/^\d+$/.test(s)) return false; // pure number = an ID, not a coupon
-    if (/^(.)\1+$/.test(s)) return false; // AAAAAA
-    if (CONTENT_BLOCKLIST.has(s)) return false;
-    if (!/\d/.test(s) && s.length < 5) return false;
-    return true;
-  }
-
-  // Merge any number of code lists, normalised + de-duplicated by code.
-  // Earlier lists win, so on-page codes keep their flags over DB duplicates.
-  function mergeCodes(...lists) {
-    const out = new Map();
-    for (const list of lists) {
-      for (const c of list || []) {
-        // Only real coupons FOUND FOR THIS SITE — drop generic/common guesses
-        // (WELCOME10, SAVE5…). We keep on-page codes and codes the DBs list for
-        // this exact store.
-        if (c.generated) continue;
-        const code = String(c.code || "").toUpperCase();
-        // Junk is dropped the moment it's merged — numeric IDs and UI words
-        // never reach the list or the apply loop.
-        if (code && isGoodCode(code) && !out.has(code)) {
-          out.set(code, { ...c, code });
-        }
-      }
-    }
-    return [...out.values()];
-  }
-
-  // Hidden gems: codes the merchant advertises on the page itself
-  // (banners, popups, "use code SUMMER20 at checkout"). Highest-confidence
-  // source because it's literally this store telling us the code.
+  // Hidden gems: codes the merchant advertises on the page itself (banners,
+  // popups, "use code SUMMER20 at checkout"). Text matching lives in core.js;
+  // here we add the codes stashed in data-* attributes too.
   function scanPageForCodes() {
     const text = (document.body && document.body.innerText) || "";
-    const out = new Map();
-    const add = (raw) => {
-      const code = String(raw || "").toUpperCase();
-      if (isGoodCode(code) && !out.has(code)) {
-        out.set(code, { code, source: "On this page", onPage: true });
-      }
-    };
-    const patterns = [
-      /(?:use|enter|apply|with|redeem)\s+(?:the\s+)?(?:promo|coupon|discount|voucher)?\s*code[:\s"'•-]+([A-Za-z0-9]{4,20})/gi,
-      /(?:promo|coupon|discount|voucher)\s*code[:\s"'•-]+([A-Za-z0-9]{4,20})/gi,
-      /\bcode\s+([A-Z0-9]{4,20})\b(?=[^a-z]{0,40}(?:checkout|save|off|order|discount))/gi,
-    ];
-    for (const re of patterns) {
-      let m;
-      while ((m = re.exec(text)) !== null) add(m[1]);
-    }
+    const byCode = new Map();
+    for (const c of CHCore.scanCodesFromText(text)) byCode.set(c.code, c);
     document
       .querySelectorAll(
         "[data-promo-code],[data-coupon-code],[data-discount-code],[data-code]"
       )
-      .forEach((el) =>
-        add(
+      .forEach((el) => {
+        const raw =
           el.getAttribute("data-promo-code") ||
-            el.getAttribute("data-coupon-code") ||
-            el.getAttribute("data-discount-code") ||
-            el.getAttribute("data-code")
-        )
-      );
-    return [...out.values()];
+          el.getAttribute("data-coupon-code") ||
+          el.getAttribute("data-discount-code") ||
+          el.getAttribute("data-code");
+        const code = String(raw || "").toUpperCase();
+        if (isGoodCode(code) && !byCode.has(code)) {
+          byCode.set(code, { code, source: "On this page", onPage: true });
+        }
+      });
+    return [...byCode.values()];
   }
   let lastPageCodes = [];
 
@@ -257,13 +176,8 @@
     return null;
   }
 
-  // Buttons that apply a coupon — and, critically, buttons we must NEVER click
-  // while auto-applying, because they place orders or take payment.
-  const APPLY_POSITIVE =
-    /\b(apply|redeem)\b|\b(apply|use|add|enter|submit)\b[^.]{0,24}\b(code|coupon|promo|promotion|voucher|discount|gift\s?card)\b/i;
-  const APPLY_DANGER =
-    /\b(place|submit|complete|confirm|review)\b[^.]{0,14}\border\b|\bplace\s+your\s+order\b|\bpay\b|\bpay\s+now\b|\bbuy\s+now\b|\bpurchase\b|\bcheck\s?out\b|\bcontinue\b|\bproceed\b|\bnext\b|\bgo\s+to\s+(payment|checkout|shipping)\b|\bcomplete\s+(purchase|payment)\b/i;
-
+  // Decide whether an element is a safe coupon-apply button. The text
+  // classification (and the hard "never click pay/order" rule) is in core.js.
   function isApplyButton(el) {
     const t = (
       el.innerText ||
@@ -282,8 +196,7 @@
       ).toLowerCase();
       return /apply|redeem/.test(dt) && !/order|pay|checkout|purchase/.test(dt);
     }
-    if (APPLY_DANGER.test(t)) return false; // hard stop: never auto-click these
-    return APPLY_POSITIVE.test(t);
+    return classifyButtonLabel(t) === "apply";
   }
 
   function findApplyButton(near) {
@@ -321,15 +234,9 @@
     if (!form) return true;
     for (const b of form.querySelectorAll("button, input[type=submit]")) {
       const t = (b.innerText || b.value || b.getAttribute("aria-label") || "").trim();
-      if (APPLY_DANGER.test(t)) return false;
+      if (isDangerButtonText(t)) return false;
     }
     return true;
-  }
-
-  function parseMoney(text) {
-    if (!text) return null;
-    const m = String(text).replace(/,/g, "").match(/-?\$?\s*(\d+(?:\.\d{1,2})?)/);
-    return m ? parseFloat(m[1]) : null;
   }
 
   function readOrderTotal() {
@@ -586,10 +493,7 @@
       const potential = (c) => {
         const r = log[c.code];
         if (r?.status === "working" && r.savings) return 1000 + r.savings;
-        const nums = (c.code.match(/\d+/g) || [])
-          .map(Number)
-          .filter((n) => n >= 1 && n <= 99); // ignore years / IDs like 2024
-        return nums.length ? Math.max(...nums) : 0;
+        return potentialFromCode(c.code);
       };
       const trust = (c) => (c.onPage ? 0 : c.generated ? 2 : 1);
       // Dedupe + drop junk one more time, then try ALL of them (no cap).
@@ -601,23 +505,14 @@
       if (settings.floatCard) showCard();
       const baseline = readOrderTotal();
 
-      // Upper bound on the dollars any single code could save — lets us stop
-      // once we're holding a code no remaining one could beat. A numeric code
-      // is treated as either "N% off" or "$N off" (whichever is bigger for this
-      // cart); a code with no number is capped at a typical free-shipping value.
-      const FREE_SHIP_CAP = 30;
-      const ceilSavings = (c) => {
-        const nums = (c.code.match(/\d+/g) || [])
-          .map(Number)
-          .filter((n) => n >= 1 && n <= 99);
-        if (!nums.length) return FREE_SHIP_CAP;
-        const n = Math.max(...nums);
-        return baseline != null ? Math.max(n, (n / 100) * baseline) : n;
-      };
-      // suffixCeil[i] = the most any code from position i onward could save.
+      // suffixCeil[i] = the most any code from position i onward could save
+      // (upper bound used for the provably-worse early exit; see CHCore).
       const suffixCeil = new Array(queue.length + 1).fill(0);
       for (let i = queue.length - 1; i >= 0; i--) {
-        suffixCeil[i] = Math.max(suffixCeil[i + 1], ceilSavings(queue[i]));
+        suffixCeil[i] = Math.max(
+          suffixCeil[i + 1],
+          ceilSavings(queue[i].code, baseline)
+        );
       }
 
       // Track the lowest total any code produced — that's the absolute best.
@@ -785,27 +680,22 @@
     else el.value = value;
   }
 
-  // Detection vocab, compiled once.
-  const RE_RATELIMIT =
-    /too many (?:attempts|tries|requests)|try again (?:later|in a|after)|please (?:wait|slow)|slow down|maximum.{0,12}attempts|temporarily (?:blocked|locked|unavailable)/;
-  const RE_INVALID =
-    /invalid (?:promo|coupon|discount|gift|code)|(?:promo|coupon|discount)\s*code\s*(?:is\s*)?(?:invalid|expired|not valid)|not a valid (?:promo|coupon|discount)|isn['’]?t valid|enter a valid|coupon.{0,12}not found|can['’]?t (?:find|apply|use).{0,16}code|no longer (?:valid|available)|code (?:has )?expired|does(?:n['’]?t| not) exist/;
-  const RE_SUCCESS =
-    /(?:promo|coupon|discount|code)\s*(?:successfully\s*)?(?:applied|added|activated)|discount applied|you saved|savings applied/;
-
   // Resolve {success, savings, rateLimited} only on a DEFINITIVE verdict — a
   // real discount, or the merchant's own "invalid" message (both of which only
   // appear after the spinner finishes). We never declare a result off a
   // mid-processing flicker, and we keep waiting while the page is still busy.
+  // The text classification lives in core.js (classifyResultText).
   function waitForResult(baseline, timeoutMs = 3500) {
     return new Promise((resolve) => {
       const start = Date.now();
       const HARD_CAP = Math.max(timeoutMs, 8000);
       const tick = () => {
         const total = readOrderTotal();
-        const body = (document.body && document.body.innerText || "").toLowerCase();
+        const verdict = classifyResultText(
+          (document.body && document.body.innerText) || ""
+        );
 
-        if (RE_RATELIMIT.test(body)) {
+        if (verdict === "ratelimit") {
           return resolve({ success: false, rateLimited: true });
         }
         // A real discount: total dropped below the no-code baseline.
@@ -813,13 +703,13 @@
           return resolve({ success: true, savings: baseline - total });
         }
         // The merchant explicitly rejected the code.
-        if (RE_INVALID.test(body)) {
+        if (verdict === "invalid") {
           return resolve({ success: false });
         }
         // Success message with a non-increasing total (e.g. free-shipping codes
         // that don't move the subtotal line we read).
         if (
-          RE_SUCCESS.test(body) &&
+          verdict === "success" &&
           total != null &&
           baseline != null &&
           total <= baseline + 0.01

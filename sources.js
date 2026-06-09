@@ -56,7 +56,7 @@ const CODE_BLOCKLIST = new Set([
   "ARRAY", "OBJECT", "BOOLEAN", "INTEGER", "FUNCTION", "PROMISE",
 ]);
 
-function isPlausibleCode(s) {
+export function isPlausibleCode(s) {
   if (!s) return false;
   if (s.length < 4 || s.length > 20) return false;
   if (!/^[A-Z0-9]+$/.test(s)) return false;
@@ -72,7 +72,7 @@ function isPlausibleCode(s) {
   return true;
 }
 
-function extractCodesFromHtml(html, sourceName) {
+export function extractCodesFromHtml(html, sourceName) {
   if (!html) return [];
   const found = new Map();
 

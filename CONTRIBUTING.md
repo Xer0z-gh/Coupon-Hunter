@@ -16,12 +16,18 @@ There's no build step — it's plain JS/CSS/HTML. `npm`/bundlers are not require
 
 ```
 manifest.json   MV3 manifest
+core.js         Shared pure logic (domain/POS, code validation, button &
+                result classifiers, savings math) — no DOM, fully unit-tested
 background.js   Service worker: hunt orchestration, savings ledger, settings
 sources.js      Per-site coupon adapters (the 20 databases) + extractors
-content.js      On-page card, merchant resolution, auto-apply loop
+content.js      On-page card, merchant resolution, auto-apply loop (uses core.js)
 content.css     Card styles (Apple / Cal-AI look)
 popup.* / welcome.*   Toolbar popup + first-run page
+tests/          Node test suite (run with `npm test`)
 ```
+
+`core.js` holds the bug-prone, security-relevant logic so it can be tested in
+isolation and shared by the content script. Put new pure helpers there.
 
 ## Good first contributions
 
@@ -46,8 +52,8 @@ popup.* / welcome.*   Toolbar popup + first-run page
 ## Sanity check before a PR
 
 ```
-node --check background.js && node --check sources.js \
-  && node --check content.js && node --check popup.js
+npm run check    # syntax-check every script
+npm test         # run the unit tests in tests/
 ```
 
 Then load it unpacked and confirm a real checkout still gets a code applied.

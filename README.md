@@ -130,17 +130,30 @@ every code in turn until one actually moves the order total.
 ```
 CouponHunter/
 ├── manifest.json        MV3 manifest
+├── core.js              Shared pure logic (tested in isolation, no DOM)
 ├── background.js        Service worker — hunts, savings ledger, settings/controls
 ├── sources.js           Per-site coupon adapters (fan-out + extractors)
 ├── content.js           In-page card + merchant resolution + auto-apply loop
 ├── content.css          Apple / Cal-AI-style card styles
 ├── popup.html/.css/.js  Toolbar popup (savings dashboard + settings)
 ├── welcome.html/.js     First-run onboarding page
+├── tests/               Node unit tests (`npm test`)
 ├── package.ps1          Builds dist/coupon-hunter-vX.Y.Z.zip for the store
 ├── LICENSE              MIT
 ├── PRIVACY.md           Privacy policy
 └── icons/               PNG icons (16/32/48/128)
 ```
+
+## Tests
+
+```
+npm test          # node --test over tests/
+npm run check     # syntax-check every script
+```
+
+The bug-prone, safety-critical logic (domain/POS resolution, code validation,
+the "never click pay/order" button classifier, result detection, savings math)
+lives in `core.js` and is covered by the unit tests.
 
 ## Build a release
 

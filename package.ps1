@@ -11,8 +11,9 @@ $zip = Join-Path $dist "coupon-hunter-v$version.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 
 $runtime = @(
-  "manifest.json", "background.js", "sources.js", "content.js", "content.css",
-  "popup.html", "popup.css", "popup.js", "welcome.html", "welcome.js"
+  "manifest.json", "background.js", "sources.js", "core.js", "content.js",
+  "content.css", "popup.html", "popup.css", "popup.js", "welcome.html",
+  "welcome.js"
 ) | ForEach-Object { Join-Path $root $_ }
 
 $missing = $runtime | Where-Object { -not (Test-Path $_) }
