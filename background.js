@@ -8,8 +8,20 @@
 import { gatherCoupons, SOURCE_NAMES } from "./sources.js";
 
 const STORAGE_PREFIX = "cohunt:cache:";
-const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour — keep codes fresh
+const DEFAULT_TTL_HOURS = 1; // keep codes fresh by default
 const CACHE_REVALIDATE_MS = 1000 * 60 * 20; // refresh in background after 20 min
+
+// The popup exposes "Cache TTL (hours)" — honor it here. Cached in memory and
+// kept current via onChanged (the worker re-reads on every cold start anyway).
+let cacheTtlMs = DEFAULT_TTL_HOURS * 3600 * 1000;
+function applyTtlHours(raw) {
+  const h = parseFloat(raw);
+  if (Number.isFinite(h) && h >= 1) cacheTtlMs = Math.min(h, 168) * 3600 * 1000;
+}
+chrome.storage.sync.get("optTtl").then((o) => applyTtlHours(o.optTtl)).catch(() => {});
+chrome.storage.onChanged.addListener((ch, area) => {
+  if (area === "sync" && ch.optTtl) applyTtlHours(ch.optTtl.newValue);
+});
 
 // Hosted checkouts / processors — never pre-warm these as if they were stores.
 const POS_HOSTS = new Set([
@@ -46,7 +58,7 @@ async function readCache(domain) {
   const obj = await chrome.storage.local.get(key);
   const hit = obj[key];
   if (!hit) return null;
-  if (Date.now() - hit.ts > CACHE_TTL_MS) return null;
+  if (Date.now() - hit.ts > cacheTtlMs) return null;
   return hit;
 }
 
@@ -207,7 +219,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             });
             chrome.action.setBadgeBackgroundColor({
               tabId: sender.tab.id,
-              color: "#2eaadc",
+              color: "#2383e2",
             });
           }
           sendResponse({ ok: true });
@@ -277,6 +289,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // keep channel open for async sendResponse
 });
 
+// Keyboard shortcut (Ctrl/Cmd+Shift+U) → trigger a hunt+apply on the active tab.
+chrome.commands?.onCommand.addListener(async (cmd) => {
+  if (cmd !== "apply-coupons") return;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, { type: "cohunt:trigger" }).catch(() => {});
+    }
+  } catch {}
+});
+
 // On tab navigation, kick off a background hunt so the popup feels instant.
 chrome.tabs.onUpdated.addListener(async (tabId, change, tab) => {
   if (change.status !== "complete" || !tab.url) return;
@@ -299,7 +322,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, change, tab) => {
       tabId,
       text: String(cached.codes.length),
     });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: "#2eaadc" });
+    chrome.action.setBadgeBackgroundColor({ tabId, color: "#2383e2" });
   } else {
     // Pre-warm in background so popup is instant on first click.
     huntForDomain(domain).catch(() => {});

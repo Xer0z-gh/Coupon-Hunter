@@ -89,12 +89,42 @@ order/pay button. (26 button-label cases are unit-tested for this.)
 
 ## Track your savings &amp; stay in control
 
-- **Lifetime savings dashboard** — the popup shows the total you've saved, how
-  many coupons were applied, and across how many stores. Stored locally only.
+- **Lifetime savings dashboard** — the popup shows the total you've saved, the
+  count of coupons applied, how many stores, and your **recent wins**
+  (store · code · amount). Stored locally only.
 - **Master on/off** and **"Pause on this site"** — full control over where it
   runs (it requests broad site access because coupon boxes can appear anywhere,
   but you decide where it's active).
 - **First-run welcome page** explains what it does and the privacy stance.
+
+## Power features
+
+- **Keyboard shortcut** — `Ctrl/Cmd+Shift+U` finds &amp; applies the best coupon
+  on the current page, no clicking required.
+- **Works worldwide** — detects coupon fields in 9+ languages (German, French,
+  Spanish, Portuguese, Italian, Dutch, Nordic…) and reads totals in **any
+  currency / locale** (`€1.234,56`, `£49.99`, `¥1,980`, `R$ 1.299,90`).
+- **Minimize to a pill** — collapse the card to a tiny corner pill; after a win
+  it tucks itself away showing "✓ Saved $X".
+- **Honest "best price" check** — if nothing beats your current total, it says
+  so (no fake urgency, no dark patterns).
+- **Survives extension reloads/updates** — open checkout tabs won't throw
+  "context invalidated" errors; the script stops cleanly and tells you to reload.
+
+## How it compares to Honey &amp; co.
+
+| | Coupon Hunter | Typical coupon extension |
+|---|---|---|
+| Price | Free, open source (MIT) | Free, closed source |
+| Business model | None — it just saves you money | Affiliate commissions / selling data |
+| Your data | Never leaves your browser | Often tracks purchases &amp; browsing |
+| Picks the **best** code | Yes — tries all, keeps the biggest, provably | Stops at the first that works |
+| Hosted checkouts (Shop Pay/Stripe) | Resolves the real store | Often applies the wrong store's codes |
+| Safety | Hard guard never clicks Pay/Place Order | — |
+
+We deliberately **don't** do cashback, "Gold/points", or price-drop tracking —
+those require an account, a server, and monetizing your shopping data. Staying
+local and free is the point.
 
 ## UI surfaces
 

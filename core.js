@@ -149,10 +149,26 @@
   }
 
   // -- Money / savings math ---------------------------------------------------
+  // Parse a price magnitude from any currency / locale. Handles US (1,234.56),
+  // European (1.234,56), bare integers, currency symbols and codes, and returns
+  // the absolute value (a "-$5.00" discount line reads as 5).
   function parseMoney(text) {
-    if (!text) return null;
-    const m = String(text).replace(/,/g, "").match(/-?\$?\s*(\d+(?:\.\d{1,2})?)/);
-    return m ? parseFloat(m[1]) : null;
+    if (text == null) return null;
+    const s = String(text);
+    const m = s.match(/\d[\d.,\s ]*\d|\d/); // first number run
+    if (!m) return null;
+    let num = m[0].replace(/[\s ]/g, "");
+    const dec = Math.max(num.lastIndexOf("."), num.lastIndexOf(","));
+    const decimals = dec === -1 ? -1 : num.length - dec - 1;
+    if (dec !== -1 && decimals >= 1 && decimals <= 2) {
+      // The last separator with 1–2 trailing digits is the decimal point;
+      // everything else is a thousands separator.
+      num = num.slice(0, dec).replace(/[.,]/g, "") + "." + num.slice(dec + 1);
+    } else {
+      num = num.replace(/[.,]/g, "");
+    }
+    const v = parseFloat(num);
+    return Number.isFinite(v) ? v : null;
   }
 
   // Discount implied by the digits in a code (SAVE40 -> 40). Ignores years/IDs.
@@ -170,6 +186,39 @@
     const n = potentialFromCode(code);
     if (!n) return cap;
     return baseline != null ? Math.max(n, (n / 100) * baseline) : n;
+  }
+
+  // Build the try-order for the apply loop: dedupe + drop junk, then sort by
+  //   1. proven winners on this store first (by what they actually saved),
+  //   2. estimated discount from the code's digits, biggest first,
+  //   3. trust on ties: on-page > listed DB > generated guess.
+  // Every code stays in the queue — ordering only decides who goes first.
+  function buildApplyQueue(codes, resultsLog) {
+    const log = resultsLog || {};
+    const potential = (c) => {
+      const r = log[c.code];
+      if (r && r.status === "working" && r.savings) return 1000 + r.savings;
+      return potentialFromCode(c.code);
+    };
+    const trust = (c) => (c.onPage ? 0 : c.generated ? 2 : 1);
+    const seen = new Set();
+    return (codes || [])
+      .filter((c) => c && isGoodCode(c.code) && !seen.has(c.code) && seen.add(c.code))
+      .sort((a, b) => potential(b) - potential(a) || trust(a) - trust(b));
+  }
+
+  // suffix[i] = the most any code from position i onward could save. Lets the
+  // apply loop stop once the banked saving provably beats everything left.
+  function suffixCeilings(queue, baseline, freeShipCap) {
+    const n = (queue || []).length;
+    const suffix = new Array(n + 1).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+      suffix[i] = Math.max(
+        suffix[i + 1],
+        ceilSavings(queue[i].code, baseline, freeShipCap)
+      );
+    }
+    return suffix;
   }
 
   const CHCore = {
@@ -193,6 +242,8 @@
     parseMoney,
     potentialFromCode,
     ceilSavings,
+    buildApplyQueue,
+    suffixCeilings,
   };
 
   // Expose: browser content-script world + Node test harness (vm/global).

@@ -102,6 +102,17 @@ test("parseMoney handles symbols, commas, negatives", () => {
   assert.equal(C.parseMoney(""), null);
 });
 
+test("parseMoney handles international currencies & EU decimals", () => {
+  assert.equal(C.parseMoney("€1.234,56"), 1234.56); // EU: . thousands, , decimal
+  assert.equal(C.parseMoney("£49.99"), 49.99);
+  assert.equal(C.parseMoney("9,99 €"), 9.99); // EU comma decimal
+  assert.equal(C.parseMoney("1.234 kr"), 1234); // EU thousands, no decimals
+  assert.equal(C.parseMoney("¥1,980"), 1980); // yen, no minor unit
+  assert.equal(C.parseMoney("₹2,499.00"), 2499);
+  assert.equal(C.parseMoney("R$ 1.299,90"), 1299.9); // Brazilian real
+  assert.equal(C.parseMoney("Total CHF 89.50"), 89.5);
+});
+
 test("potentialFromCode extracts discount, ignores years/IDs", () => {
   assert.equal(C.potentialFromCode("SAVE40"), 40);
   assert.equal(C.potentialFromCode("WELCOME10"), 10);
@@ -128,4 +139,52 @@ test("scanCodesFromText finds advertised codes", () => {
   assert.ok(found.includes("WELCOME10"), "WELCOME10");
   assert.ok(found.includes("SAVE5"), "SAVE5");
   for (const c of C.scanCodesFromText(t)) assert.equal(c.onPage, true);
+});
+
+test("buildApplyQueue: proven winners first, then potential, then trust", () => {
+  const log = { LOYAL5: { status: "working", savings: 8.5 } };
+  const codes = [
+    { code: "WELCOME10" },
+    { code: "SAVE40" },
+    { code: "FREESHIP", onPage: true },
+    { code: "TAKE25" },
+    { code: "SUMMER2024", generated: true },
+    { code: "LOYAL5" },
+    { code: "GET15", generated: true },
+    { code: "HELLO15" },
+    { code: "SAVE40" }, // duplicate — must be dropped
+    { code: "16580828" }, // junk — must be dropped
+  ];
+  const q = C.buildApplyQueue(codes, log).map((c) => c.code);
+  assert.equal(q[0], "LOYAL5"); // proven winner leads
+  assert.equal(q[1], "SAVE40");
+  assert.equal(q[2], "TAKE25");
+  // Equal potential (15): non-generated beats generated.
+  assert.ok(q.indexOf("HELLO15") < q.indexOf("GET15"));
+  // Zero potential: on-page beats generated guess.
+  assert.ok(q.indexOf("FREESHIP") < q.indexOf("SUMMER2024"));
+  // Dedupe + junk filter.
+  assert.equal(q.filter((c) => c === "SAVE40").length, 1);
+  assert.ok(!q.includes("16580828"));
+});
+
+test("suffixCeilings supports the provably-worse early exit", () => {
+  const queue = [
+    { code: "HALF50" },
+    { code: "SAVE40" },
+    { code: "TAKE25" },
+    { code: "WELCOME10" },
+    { code: "FREESHIP" },
+  ];
+  const suffix = C.suffixCeilings(queue, 100);
+  // From index 1 on, nothing can beat more than $40.
+  assert.equal(suffix[1], 40);
+  // FREESHIP's free-ship cap ($30) holds the later ceilings up.
+  assert.equal(suffix[3], 30);
+  // Banked $50 from HALF50 → provably nothing left can beat it.
+  assert.ok(50 + 0.01 >= suffix[1]);
+  // Banked only $20 → SAVE40 could still beat it; must NOT exit early.
+  assert.ok(!(20 + 0.01 >= suffix[1]));
+  // Empty queue is safe.
+  assert.deepEqual(C.suffixCeilings([], 100), [0]);
 });

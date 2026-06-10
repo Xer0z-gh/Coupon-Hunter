@@ -93,7 +93,29 @@ function loadSavings() {
     $("savingsTotal").textContent = `$${(res.total || 0).toFixed(2)}`;
     $("savingsCount").textContent = res.count || 0;
     $("savingsStores").textContent = res.stores || 0;
+    renderWins(res.history || []);
   });
+}
+
+// Last few real wins (store · code · amount) — proof it's working.
+function renderWins(history) {
+  const wins = history.filter((h) => h && h.savings > 0).slice(0, 5);
+  $("wins").hidden = wins.length === 0;
+  const wrap = $("winsList");
+  wrap.innerHTML = "";
+  for (const w of wins) {
+    const row = document.createElement("div");
+    row.className = "win-row";
+    row.innerHTML = `
+      <span class="win-store"></span>
+      <code class="win-code"></code>
+      <span class="win-amt"></span>
+    `;
+    row.querySelector(".win-store").textContent = w.domain || "";
+    row.querySelector(".win-code").textContent = w.code || "";
+    row.querySelector(".win-amt").textContent = `–$${(w.savings || 0).toFixed(2)}`;
+    wrap.appendChild(row);
+  }
 }
 
 // -- Enabled / per-site pause -----------------------------------------------
@@ -339,6 +361,8 @@ document.addEventListener("DOMContentLoaded", () => {
   $("autoApplyBtn").addEventListener("click", triggerAutoApply);
 
   document.addEventListener("keydown", (e) => {
+    // Don't hijack typing inside settings inputs (e.g. the cache TTL field).
+    if (e.target && /^(input|textarea|select)$/i.test(e.target.tagName)) return;
     if (e.key === "Enter" && !e.altKey) {
       e.preventDefault();
       startHunt(false);

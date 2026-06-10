@@ -35,8 +35,11 @@ isolation and shared by the content script. Put new pure helpers there.
   using `fetchText` + `extractCodesFromHtml`, then add it to `ADAPTERS`.
 - **Fix a store we miss.** If a checkout's coupon box or order total isn't
   detected, extend `COUPON_INPUT_SELECTORS` / `TOTAL_SELECTORS` in `content.js`.
-- **Improve detection.** The success/invalid/rate-limit phrase matchers live in
-  `content.js` (`RE_SUCCESS`, `RE_INVALID`, `RE_RATELIMIT`).
+- **Improve detection.** The success/invalid/rate-limit phrase matchers and the
+  `parseMoney` currency parser live in `core.js` (`classifyResultText`,
+  `RE_SUCCESS`, `RE_INVALID`, `RE_RATELIMIT`) — add cases + a test in `tests/`.
+- **Support another language.** Add the local word for "coupon" to
+  `COUPON_TERMS` in `content.js` so the field is detected in that locale.
 - **New POS/checkout host.** Add it to `POS_HOSTS` so the real merchant is
   resolved instead of the processor.
 

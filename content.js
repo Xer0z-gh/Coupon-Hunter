@@ -1,10 +1,9 @@
 // Coupon Hunter — content script.
 // Runs on every page. When it spots a coupon-code input it:
 //   1. Asks the background worker for codes for the current domain.
-//   2. Presents a floating Notion-style card on the page.
-//   3. On user opt-in (or auto if enabled), iterates through codes,
-//      applying each via the page's existing apply button and watching
-//      the order total for a real change.
+//   2. Presents a floating card on the page (collapsible to a pill).
+//   3. Auto-applies codes via the page's own apply button, watching the order
+//      total, and keeps whichever code saves the most.
 
 (() => {
   if (window.__couponHunterLoaded) return;
@@ -22,24 +21,65 @@
     classifyResultText,
     classifyButtonLabel,
     isDangerButtonText,
-    potentialFromCode,
-    ceilSavings,
+    buildApplyQueue,
+    suffixCeilings,
   } = CHCore;
   const rootDomain = rootDomainOf(location.hostname);
+
+  // -- Safe extension-API layer ------------------------------------------------
+  // When the extension is reloaded/updated, content scripts in already-open
+  // tabs keep running but every chrome.* call starts throwing "Extension
+  // context invalidated". Everything below goes through this layer so a dead
+  // context stops the machinery quietly instead of spraying uncaught errors.
+  let dead = false;
+  let mo = null; // MutationObserver, assigned at the bottom
+  let retryTimer = null;
+  let collapseTimer = null;
+
+  function alive() {
+    try {
+      return !dead && !!(chrome.runtime && chrome.runtime.id);
+    } catch {
+      return false;
+    }
+  }
+
+  function markDead() {
+    if (dead) return;
+    dead = true;
+    try { mo && mo.disconnect(); } catch {}
+    clearTimeout(retryTimer);
+    clearTimeout(collapseTimer);
+    try {
+      setStatus("Coupon Hunter was updated — reload this page to keep hunting.");
+    } catch {}
+  }
+
+  // Fire-and-forget or request/response — never throws, never rejects.
+  // Resolves null when the background can't be reached.
+  function safeSend(msg) {
+    return new Promise((resolve) => {
+      if (!alive()) {
+        markDead();
+        return resolve(null);
+      }
+      try {
+        chrome.runtime.sendMessage(msg, (res) => {
+          // Reading lastError marks the error as handled (no console spam).
+          if (chrome.runtime.lastError) return resolve(null);
+          resolve(res ?? null);
+        });
+      } catch {
+        markDead();
+        resolve(null);
+      }
+    });
+  }
 
   // -- Third-party checkout / POS detection -----------------------------------
   // On hosted checkouts (Shop Pay, Stripe, PayPal, Square, Klarna, etc.) the
   // page's own domain is the PROCESSOR, not the store. We resolve the REAL
   // merchant the cart belongs to and hunt + apply for that domain only.
-  function guessMerchantFromPage() {
-    return CHCore.guessMerchantFromHtml(
-      document.documentElement.outerHTML || ""
-    );
-  }
-
-  // The store domain we hunt + apply codes for. Returns null on a POS page we
-  // can't attribute — in which case we deliberately do NOT hunt, so we never
-  // apply some other shop's codes to your order.
   function resolveMerchant() {
     const here = location.hostname.toLowerCase().replace(/^www\./, "");
     if (!isPOS(here)) return rootDomainOf(here);
@@ -49,7 +89,7 @@
         if (rh && !isPOS(rh)) return rootDomainOf(rh);
       }
     } catch {}
-    return guessMerchantFromPage();
+    return CHCore.guessMerchantFromHtml(document.documentElement.outerHTML || "");
   }
 
   let huntDomain = null; // resolved store domain for this checkout
@@ -63,37 +103,41 @@
     disabledSites: [],
   };
   let settingsLoaded = false;
-  chrome.storage.sync
-    .get([
-      "optEnabled",
-      "optAutoHunt",
-      "optAutoApply",
-      "optFloatCard",
-      "cohunt:disabledSites",
-    ])
-    .then((o) => {
-      settings.enabled = o.optEnabled !== false;
-      settings.autoHunt = o.optAutoHunt !== false;
-      settings.autoApply = o.optAutoApply !== false;
-      settings.floatCard = o.optFloatCard !== false;
-      settings.disabledSites = o["cohunt:disabledSites"] || [];
-      settingsLoaded = true;
-      autoTrigger();
-    })
-    .catch(() => {
-      settingsLoaded = true;
-      autoTrigger();
+  try {
+    chrome.storage.sync
+      .get([
+        "optEnabled",
+        "optAutoHunt",
+        "optAutoApply",
+        "optFloatCard",
+        "cohunt:disabledSites",
+      ])
+      .then((o) => {
+        settings.enabled = o.optEnabled !== false;
+        settings.autoHunt = o.optAutoHunt !== false;
+        settings.autoApply = o.optAutoApply !== false;
+        settings.floatCard = o.optFloatCard !== false;
+        settings.disabledSites = o["cohunt:disabledSites"] || [];
+        settingsLoaded = true;
+        autoTrigger();
+      })
+      .catch(() => {
+        settingsLoaded = true;
+        autoTrigger();
+      });
+    chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== "sync") return;
+      if (ch.optEnabled) settings.enabled = ch.optEnabled.newValue !== false;
+      if (ch.optAutoHunt) settings.autoHunt = ch.optAutoHunt.newValue !== false;
+      if (ch.optAutoApply) settings.autoApply = ch.optAutoApply.newValue !== false;
+      if (ch.optFloatCard) settings.floatCard = ch.optFloatCard.newValue !== false;
+      if (ch["cohunt:disabledSites"]) {
+        settings.disabledSites = ch["cohunt:disabledSites"].newValue || [];
+      }
     });
-  chrome.storage.onChanged.addListener((ch, area) => {
-    if (area !== "sync") return;
-    if (ch.optEnabled) settings.enabled = ch.optEnabled.newValue !== false;
-    if (ch.optAutoHunt) settings.autoHunt = ch.optAutoHunt.newValue !== false;
-    if (ch.optAutoApply) settings.autoApply = ch.optAutoApply.newValue !== false;
-    if (ch.optFloatCard) settings.floatCard = ch.optFloatCard.newValue !== false;
-    if (ch["cohunt:disabledSites"]) {
-      settings.disabledSites = ch["cohunt:disabledSites"].newValue || [];
-    }
-  });
+  } catch {
+    settingsLoaded = true;
+  }
 
   // Is the store for the current page paused by the user?
   function isSiteDisabled(domain) {
@@ -103,34 +147,54 @@
 
   // Let the popup ask which store this page resolves to, so it shows the same
   // merchant the on-page card uses — even behind a hosted checkout.
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (msg?.type !== "cohunt:get-domain") return;
-    const m = huntDomain || resolveMerchant();
-    sendResponse({ domain: m || null, pos: isPOS(location.hostname) });
-    return true;
-  });
+  try {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (msg?.type === "cohunt:get-domain") {
+        const m = huntDomain || resolveMerchant();
+        sendResponse({ domain: m || null, pos: isPOS(location.hostname) });
+        return true;
+      }
+      if (msg?.type === "hunt-progress") {
+        onHuntProgress(msg);
+      }
+      // Keyboard shortcut (or popup) → force a hunt/apply right now.
+      if (msg?.type === "cohunt:trigger") {
+        startHunt({ force: true });
+      }
+    });
+  } catch {}
 
   // -- Selectors --------------------------------------------------------------
-  const COUPON_INPUT_SELECTORS = [
-    'input[name*="coupon" i]',
-    'input[id*="coupon" i]',
-    'input[placeholder*="coupon" i]',
-    'input[name*="promo" i]',
-    'input[id*="promo" i]',
-    'input[placeholder*="promo" i]',
-    'input[name*="discount" i]',
-    'input[id*="discount" i]',
-    'input[placeholder*="discount" i]',
-    'input[name*="voucher" i]',
-    'input[id*="voucher" i]',
-    'input[placeholder*="voucher" i]',
-    'input[name*="giftcard" i][name*="code" i]',
-    'input[aria-label*="promo" i]',
-    'input[aria-label*="coupon" i]',
-    'input[aria-label*="discount" i]',
+  // One combined selector → one DOM pass. Includes the words checkouts use for
+  // a coupon field across major languages, so it works far beyond US stores.
+  // (English, German, French, Spanish, Portuguese, Italian, Dutch, Nordic.)
+  const COUPON_TERMS = [
+    "coupon",
+    "promo",
+    "discount",
+    "voucher",
+    "gutschein", // de
+    "rabatt", // de/sv/no
+    "descuento", // es
+    "cupon", // es
+    "cupom", // pt
+    "desconto", // pt
+    "sconto", // it
+    "buono", // it
+    "korting", // nl
+    "kupon", // pl
+    "reduction", // fr (réduction)
   ];
+  const COUPON_INPUT_SELECTOR = COUPON_TERMS.flatMap((t) => [
+    `input[name*="${t}" i]`,
+    `input[id*="${t}" i]`,
+    `input[placeholder*="${t}" i]`,
+    `input[aria-label*="${t}" i]`,
+  ])
+    .concat('input[name*="giftcard" i][name*="code" i]')
+    .join(",");
 
-  const TOTAL_SELECTORS = [
+  const TOTAL_SELECTOR = [
     '[data-test*="total" i]',
     '[data-testid*="total" i]',
     '[class*="grand-total" i]',
@@ -140,7 +204,22 @@
     '[class*="cart-total" i]',
     '[id*="grand-total" i]',
     '[id*="order-total" i]',
-  ];
+  ].join(",");
+
+  function findCouponInput() {
+    for (const el of document.querySelectorAll(COUPON_INPUT_SELECTOR)) {
+      if (el.offsetParent !== null) return el;
+    }
+    return null;
+  }
+
+  function readOrderTotal() {
+    for (const el of document.querySelectorAll(TOTAL_SELECTOR)) {
+      const v = parseMoney(el.innerText);
+      if (v != null) return v;
+    }
+    return null;
+  }
 
   // Hidden gems: codes the merchant advertises on the page itself (banners,
   // popups, "use code SUMMER20 at checkout"). Text matching lives in core.js;
@@ -167,14 +246,6 @@
     return [...byCode.values()];
   }
   let lastPageCodes = [];
-
-  function findCouponInput() {
-    for (const sel of COUPON_INPUT_SELECTORS) {
-      const el = document.querySelector(sel);
-      if (el && el.offsetParent !== null) return el;
-    }
-    return null;
-  }
 
   // Decide whether an element is a safe coupon-apply button. The text
   // classification (and the hard "never click pay/order" rule) is in core.js.
@@ -239,29 +310,25 @@
     return true;
   }
 
-  function readOrderTotal() {
-    for (const sel of TOTAL_SELECTORS) {
-      const el = document.querySelector(sel);
-      if (el) {
-        const v = parseMoney(el.innerText);
-        if (v != null) return v;
-      }
-    }
-    return null;
-  }
-
   // -- UI ---------------------------------------------------------------------
   const card = document.createElement("div");
   card.id = "cohunt-card";
   card.setAttribute("data-cohunt", "1");
   card.innerHTML = `
+    <button class="cohunt-pill" data-cohunt-pill hidden>
+      <span class="cohunt-spark">✦</span>
+      <span data-cohunt-pill-text>Coupon Hunter</span>
+    </button>
     <div class="cohunt-card-inner">
       <header class="cohunt-head">
         <div class="cohunt-brand">
           <span class="cohunt-spark">✦</span>
           <span class="cohunt-title">Coupon Hunter</span>
         </div>
-        <button class="cohunt-close" aria-label="Close">×</button>
+        <div class="cohunt-head-actions">
+          <button class="cohunt-minimize" aria-label="Minimize" title="Minimize">–</button>
+          <button class="cohunt-close" aria-label="Close">×</button>
+        </div>
       </header>
 
       <div class="cohunt-stats">
@@ -280,6 +347,10 @@
         <span class="cohunt-status" data-cohunt-status>Looking around…</span>
       </div>
 
+      <div class="cohunt-progress" data-cohunt-progress hidden>
+        <div class="cohunt-progress-fill" data-cohunt-progress-fill></div>
+      </div>
+
       <ul class="cohunt-list" data-cohunt-list></ul>
 
       <div class="cohunt-foot">
@@ -295,6 +366,8 @@
 
   const $ = (sel) => card.querySelector(sel);
   $(".cohunt-close").addEventListener("click", () => hideCard());
+  $(".cohunt-minimize").addEventListener("click", () => collapseCard());
+  $("[data-cohunt-pill]").addEventListener("click", () => expandCard());
   $("[data-cohunt-refresh]").addEventListener("click", () => startHunt({ force: true }));
   $("[data-cohunt-apply]").addEventListener("click", () => autoApplyLoop());
 
@@ -303,6 +376,22 @@
   }
   function hideCard() {
     card.style.display = "none";
+  }
+  function collapseCard(pillText) {
+    clearTimeout(collapseTimer);
+    if (pillText) $("[data-cohunt-pill-text]").textContent = pillText;
+    card.classList.add("cohunt-collapsed");
+    $("[data-cohunt-pill]").hidden = false;
+  }
+  function expandCard() {
+    clearTimeout(collapseTimer);
+    card.classList.remove("cohunt-collapsed");
+    $("[data-cohunt-pill]").hidden = true;
+  }
+  // After a final state, tuck the card away into an unobtrusive pill.
+  function autoCollapseSoon(pillText, ms = 8000) {
+    clearTimeout(collapseTimer);
+    collapseTimer = setTimeout(() => collapseCard(pillText), ms);
   }
   function setStatus(s) {
     $("[data-cohunt-status]").textContent = s;
@@ -313,8 +402,26 @@
   function setStats(saved, working) {
     const s = $("[data-cohunt-saved]");
     const w = $("[data-cohunt-applied]");
-    if (s) s.textContent = `$${(saved || 0).toFixed(2)}`;
+    if (s) {
+      const next = `$${(saved || 0).toFixed(2)}`;
+      if (s.textContent !== next) {
+        s.textContent = next;
+        s.classList.remove("cohunt-pop");
+        void s.offsetWidth; // restart the pop animation
+        s.classList.add("cohunt-pop");
+      }
+    }
     if (w) w.textContent = String(working || 0);
+  }
+  function setProgress(done, total) {
+    const bar = $("[data-cohunt-progress]");
+    const fill = $("[data-cohunt-progress-fill]");
+    if (!total) {
+      bar.hidden = true;
+      return;
+    }
+    bar.hidden = false;
+    fill.style.width = `${Math.round((done / total) * 100)}%`;
   }
 
   let currentCodes = [];
@@ -332,8 +439,8 @@
       const li = document.createElement("li");
       li.className = `cohunt-item cohunt-${state}`;
       li.innerHTML = `
-        <code class="cohunt-code">${c.code}</code>
-        <span class="cohunt-source">${c.source || ""}</span>
+        <code class="cohunt-code"></code>
+        <span class="cohunt-source"></span>
         <span class="cohunt-state">${
           state === "working"
             ? "Saved ✓"
@@ -344,6 +451,8 @@
             : ""
         }</span>
       `;
+      li.querySelector(".cohunt-code").textContent = c.code;
+      li.querySelector(".cohunt-source").textContent = c.source || "";
       li.querySelector(".cohunt-code").addEventListener("click", () => {
         navigator.clipboard?.writeText(c.code);
         setStatus(`Copied ${c.code}`);
@@ -354,6 +463,9 @@
 
   // -- Hunt orchestration ------------------------------------------------------
   function startHunt({ force = false } = {}) {
+    if (dead) return;
+    expandCard();
+    card.classList.remove("cohunt-success");
     huntDomain = resolveMerchant();
     if (!huntDomain) {
       // Hosted checkout we couldn't attribute to a store. Do NOT hunt — better
@@ -373,22 +485,18 @@
     retryPending = false;
     // Hidden gems the merchant advertises on this very page.
     lastPageCodes = scanPageForCodes();
-    chrome.runtime.sendMessage(
-      { type: "hunt", domain: huntDomain, force },
-      (res) => {
-        if (!res?.ok) {
-          // Still try whatever the page itself advertised.
-          currentCodes = mergeCodes(lastPageCodes);
-          onCodesResolved();
-          return;
-        }
-        currentCodes = mergeCodes(lastPageCodes, res.codes || []);
-        chrome.runtime
-          .sendMessage({ type: "open-popup", count: currentCodes.length })
-          .catch(() => {});
+    safeSend({ type: "hunt", domain: huntDomain, force }).then((res) => {
+      if (dead) return;
+      if (!res?.ok) {
+        // Background unreachable — still try whatever the page itself advertised.
+        currentCodes = mergeCodes(lastPageCodes);
         onCodesResolved();
+        return;
       }
-    );
+      currentCodes = mergeCodes(lastPageCodes, res.codes || []);
+      safeSend({ type: "open-popup", count: currentCodes.length });
+      onCodesResolved();
+    });
   }
 
   // Codes are scoped to this exact store: on-page codes + codes the DBs list
@@ -415,10 +523,9 @@
   // DBs being briefly down, or the merchant's on-page code loading late).
   let retryAttempts = 0;
   let retryPending = false;
-  let retryTimer = null;
   const MAX_RETRIES = 6;
   function scheduleRetryHunt() {
-    if (retryPending) return;
+    if (retryPending || dead) return;
     if (retryAttempts >= MAX_RETRIES) {
       setStatus(`No codes found for ${huntDomain} yet — click ↻ to keep looking.`);
       return;
@@ -436,8 +543,8 @@
     }, delay);
   }
 
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type !== "hunt-progress") return;
+  function onHuntProgress(msg) {
+    if (dead) return;
     if (msg.domain !== huntDomain) return; // only our resolved store
     if (msg.phase === "source-done") {
       setStatus(`Checked ${msg.source} — ${msg.found} hits.`);
@@ -447,7 +554,7 @@
       currentCodes = mergeCodes(lastPageCodes, msg.codes || []);
       onCodesResolved();
     }
-  });
+  }
 
   // -- Apply loop --------------------------------------------------------------
   // Runs itself once codes land, no user click required. Guarded so it fires
@@ -461,15 +568,6 @@
     autoApplyLoop();
   }
 
-  function getResultsLog() {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        { type: "get-results-log", domain: huntDomain },
-        (r) => resolve(r?.log || {})
-      );
-    });
-  }
-
   async function autoApplyLoop() {
     const input = findCouponInput();
     if (!input) {
@@ -480,47 +578,26 @@
       setStatus("Nothing to try yet.");
       return;
     }
-    if (applyInFlight) return;
+    if (applyInFlight || dead) return;
     applyInFlight = true;
     try {
-      // Order by POTENTIAL savings (biggest first) so the likely winners are
-      // tried up front — but EVERY code still gets tried, nothing is skipped.
-      //   * proven winners (saved real money here before) go first, by amount
-      //   * otherwise estimate the discount from the digits in the code
-      //     (SAVE40 -> 40, WELCOME10 -> 10, FREESHIP -> 0)
-      //   * ties broken by trust: on-page > listed DB > generated guess
-      const log = await getResultsLog();
-      const potential = (c) => {
-        const r = log[c.code];
-        if (r?.status === "working" && r.savings) return 1000 + r.savings;
-        return potentialFromCode(c.code);
-      };
-      const trust = (c) => (c.onPage ? 0 : c.generated ? 2 : 1);
-      // Dedupe + drop junk one more time, then try ALL of them (no cap).
-      const seen = new Set();
-      const queue = [...currentCodes]
-        .filter((c) => isGoodCode(c.code) && !seen.has(c.code) && seen.add(c.code))
-        .sort((a, b) => potential(b) - potential(a) || trust(a) - trust(b));
+      // Try-order and early-exit bounds are pure logic — see core.js.
+      const logRes = await safeSend({ type: "get-results-log", domain: huntDomain });
+      const queue = buildApplyQueue(currentCodes, logRes?.log || {});
 
       if (settings.floatCard) showCard();
+      expandCard();
       const baseline = readOrderTotal();
-
-      // suffixCeil[i] = the most any code from position i onward could save
-      // (upper bound used for the provably-worse early exit; see CHCore).
-      const suffixCeil = new Array(queue.length + 1).fill(0);
-      for (let i = queue.length - 1; i >= 0; i--) {
-        suffixCeil[i] = Math.max(
-          suffixCeil[i + 1],
-          ceilSavings(queue[i].code, baseline)
-        );
-      }
+      const suffixCeil = suffixCeilings(queue, baseline);
 
       // Track the lowest total any code produced — that's the absolute best.
       let best = null; // { code, savings }
       let bestTotal = baseline == null ? Infinity : baseline;
       let workingCount = 0;
+      let tested = 0;
       setStats(0, 0);
-      for (let i = 0; i < queue.length; i++) {
+      setProgress(0, queue.length);
+      for (let i = 0; i < queue.length && !dead; i++) {
         const c = queue[i];
         const field = findCouponInput();
         if (!field) break; // checkout advanced / field vanished — stop safely
@@ -549,20 +626,20 @@
         renderList();
         setStatus(`Trying ${c.code}… (${i + 1} of ${queue.length})`);
         const result = await tryCode(field, c.code, baseline);
+        tested++;
+        setProgress(i + 1, queue.length);
 
         // Never skip the rest — try every code. (A rate-limit signal just
         // counts as a failed attempt and we keep going.)
         attempted.set(c.code, result.success ? "working" : "failed");
         renderList();
-        chrome.runtime
-          .sendMessage({
-            type: "record-result",
-            domain: huntDomain,
-            code: c.code,
-            status: result.success ? "working" : "failed",
-            savings: result.savings,
-          })
-          .catch(() => {});
+        safeSend({
+          type: "record-result",
+          domain: huntDomain,
+          code: c.code,
+          status: result.success ? "working" : "failed",
+          savings: result.savings,
+        });
 
         if (result.success) {
           workingCount++;
@@ -581,21 +658,31 @@
         // Human-ish pause between codes — varies so it isn't a robotic burst.
         await sleep(INTER_CODE_DELAY_MS + Math.floor(Math.random() * 350));
       }
+      setProgress(0, 0);
 
       if (best) {
         // Re-apply the winner so checkout keeps the biggest discount.
         const field = findCouponInput();
-        if (field) await tryCode(field, best.code, baseline);
+        if (field && !dead) await tryCode(field, best.code, baseline);
         setStats(best.savings, workingCount);
-        setStatus(
-          best.savings
-            ? `All done — ${best.code} saved you $${best.savings.toFixed(2)} 🎉`
-            : `All done — applied ${best.code}.`
-        );
+        card.classList.add("cohunt-success");
+        if (best.savings) {
+          setStatus(`All done — ${best.code} saved you $${best.savings.toFixed(2)} 🎉`);
+          autoCollapseSoon(`✓ Saved $${best.savings.toFixed(2)}`);
+        } else {
+          setStatus(`All done — applied ${best.code}.`);
+          autoCollapseSoon(`✓ ${best.code} applied`);
+        }
       } else {
         // Never leave a junk code in the box — clear it back out.
         clearCouponField();
-        setStatus("No working code this time — cleared the box for you.");
+        // The Honey-style reassurance: a clean "nothing left on the table".
+        setStatus(
+          tested > 0
+            ? `We tested ${tested} code${tested > 1 ? "s" : ""} — you already have the best price. ✓`
+            : "No working code this time — cleared the box for you."
+        );
+        autoCollapseSoon("✓ Best price");
       }
     } finally {
       applyInFlight = false;
@@ -654,7 +741,7 @@
     }
     // Give the merchant a moment to start processing, then wait for a verdict.
     await sleep(150);
-    return waitForResult(baseline);
+    return waitForResult(input, baseline);
   }
 
   // True while the checkout is visibly validating (spinner / loading state).
@@ -680,20 +767,42 @@
     else el.value = value;
   }
 
+  // Where the merchant prints "applied"/"invalid" — usually near the coupon
+  // field. Reading that region is far cheaper than document.body.innerText on
+  // a big checkout, so we read the scoped text every tick and the full body
+  // only every other tick (some sites toast at the top of the page).
+  function verdictScopeFor(input) {
+    if (!input) return null;
+    let scope = input.closest("form");
+    if (!scope) {
+      scope = input.parentElement;
+      for (let i = 0; i < 3 && scope && scope.parentElement; i++) {
+        scope = scope.parentElement;
+      }
+    }
+    return scope;
+  }
+
   // Resolve {success, savings, rateLimited} only on a DEFINITIVE verdict — a
   // real discount, or the merchant's own "invalid" message (both of which only
   // appear after the spinner finishes). We never declare a result off a
   // mid-processing flicker, and we keep waiting while the page is still busy.
   // The text classification lives in core.js (classifyResultText).
-  function waitForResult(baseline, timeoutMs = 3500) {
+  function waitForResult(input, baseline, timeoutMs = 3500) {
+    const scope = verdictScopeFor(input);
     return new Promise((resolve) => {
       const start = Date.now();
       const HARD_CAP = Math.max(timeoutMs, 8000);
+      let ticks = 0;
       const tick = () => {
+        ticks++;
         const total = readOrderTotal();
-        const verdict = classifyResultText(
-          (document.body && document.body.innerText) || ""
-        );
+        let verdict = classifyResultText((scope && scope.innerText) || "");
+        if (!verdict && (ticks % 2 === 0 || !scope)) {
+          verdict = classifyResultText(
+            (document.body && document.body.innerText) || ""
+          );
+        }
 
         if (verdict === "ratelimit") {
           return resolve({ success: false, rateLimited: true });
@@ -741,7 +850,7 @@
   // known. The hunt → auto-apply chain then runs with zero user interaction.
   let autoHuntTriggered = false;
   function autoTrigger() {
-    if (!settingsLoaded || autoHuntTriggered) return;
+    if (!settingsLoaded || autoHuntTriggered || dead) return;
     if (!settings.enabled) return; // master off
     if (!settings.autoHunt) return;
     if (!findCouponInput()) return;
@@ -752,11 +861,22 @@
     if (!merchant) return;
     if (isSiteDisabled(merchant)) return; // user paused this store
     autoHuntTriggered = true;
+    if (mo) mo.disconnect(); // one-shot — no need to keep watching the DOM
     startHunt();
   }
 
-  // Single-page checkouts mount the coupon field late — keep watching for it.
-  const mo = new MutationObserver(autoTrigger);
+  // Single-page checkouts mount the coupon field late — keep watching for it,
+  // but debounce: checkout pages mutate constantly and the field check isn't
+  // free. One trailing check per 200ms burst is plenty.
+  let moTimer = null;
+  mo = new MutationObserver(() => {
+    if (autoHuntTriggered || dead) {
+      mo.disconnect();
+      return;
+    }
+    clearTimeout(moTimer);
+    moTimer = setTimeout(autoTrigger, 200);
+  });
   mo.observe(document.documentElement, { childList: true, subtree: true });
 
   // The popup can force a hunt/apply regardless of the auto settings.
