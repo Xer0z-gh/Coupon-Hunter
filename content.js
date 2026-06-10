@@ -452,7 +452,10 @@
         }</span>
       `;
       li.querySelector(".cohunt-code").textContent = c.code;
-      li.querySelector(".cohunt-source").textContent = c.source || "";
+      // Show cross-source consensus ("CouponFollow +3") — corroborated codes
+      // are far likelier to work.
+      const extra = c.sourceCount > 1 ? ` +${c.sourceCount - 1}` : "";
+      li.querySelector(".cohunt-source").textContent = (c.source || "") + extra;
       li.querySelector(".cohunt-code").addEventListener("click", () => {
         navigator.clipboard?.writeText(c.code);
         setStatus(`Copied ${c.code}`);
@@ -583,11 +586,13 @@
     try {
       // Try-order and early-exit bounds are pure logic — see core.js.
       const logRes = await safeSend({ type: "get-results-log", domain: huntDomain });
-      const queue = buildApplyQueue(currentCodes, logRes?.log || {});
 
       if (settings.floatCard) showCard();
       expandCard();
       const baseline = readOrderTotal();
+      // Order by expected savings (proven > advertised discount > guess), using
+      // the live cart total to turn "20% off" into real dollars.
+      const queue = buildApplyQueue(currentCodes, logRes?.log || {}, baseline);
       const suffixCeil = suffixCeilings(queue, baseline);
 
       // Track the lowest total any code produced — that's the absolute best.

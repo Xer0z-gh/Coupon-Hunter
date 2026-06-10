@@ -72,41 +72,60 @@ export function isPlausibleCode(s) {
   return true;
 }
 
+// The discount a listing advertises near a code — used downstream to rank by
+// how much each code is likely to save (e.g. "30% OFF … BLACKFRIDAY" beats
+// "SAVE10"). It only affects try-order, never the measured result, so a noisy
+// match is harmless.
+export function parseDiscountHint(text) {
+  const out = {};
+  if (!text) return out;
+  const t = String(text).toLowerCase();
+  const pct = t.match(/(\d{1,2})\s*%/);
+  if (pct) {
+    const n = parseInt(pct[1], 10);
+    if (n >= 1 && n <= 95) out.pct = n;
+  }
+  const amt =
+    t.match(/\$\s*(\d{1,4})(?:\.\d{2})?\s*(?:off|discount)/) ||
+    t.match(/(?:off|save)\s*\$\s*(\d{1,4})/);
+  if (amt) {
+    const n = parseInt(amt[1], 10);
+    if (n >= 1 && n <= 2000) out.amount = n;
+  }
+  if (/free\s*ship/.test(t)) out.freeShip = true;
+  return out;
+}
+
+const CODE_CAP_PER_SOURCE = 40; // never let one page flood the queue
+
 export function extractCodesFromHtml(html, sourceName) {
   if (!html) return [];
   const found = new Map();
+  // The discount headline usually sits just before the code in its card, so
+  // read a window ending a little after the match and parse the offer from it.
+  const add = (raw, idx) => {
+    const code = String(raw).replace(/[-_]/g, "").toUpperCase();
+    if (!isPlausibleCode(code) || found.has(code)) return;
+    const window = html.slice(Math.max(0, idx - 320), idx + 60).replace(/<[^>]+>/g, " ");
+    found.set(code, { code, title: "", source: sourceName, ...parseDiscountHint(window) });
+  };
 
+  let m;
   // 1. Structural attribute extraction: code-bearing attributes used widely.
   const attrRe =
     /(?:data-code|data-clipboard-text|data-promo|data-coupon|data-coupon-code|data-cb-coupon-code|data-cl|data-coupon-id-attr)\s*=\s*["']([A-Z0-9_\-]{4,20})["']/g;
-  let m;
-  while ((m = attrRe.exec(html)) !== null) {
-    const code = m[1].replace(/[-_]/g, "").toUpperCase();
-    if (isPlausibleCode(code)) {
-      found.set(code, { code, title: "", source: sourceName });
-    }
-  }
+  while ((m = attrRe.exec(html)) !== null) add(m[1], m.index);
 
   // 2. Element text inside common code containers.
   const codeTagRe =
     /<(?:code|span|div|button)[^>]*class="[^"]*(?:code|promo|coupon|voucher)[^"]*"[^>]*>\s*([A-Z0-9]{4,20})\s*</gi;
-  while ((m = codeTagRe.exec(html)) !== null) {
-    const code = m[1].toUpperCase();
-    if (isPlausibleCode(code)) {
-      found.set(code, { code, title: "", source: sourceName });
-    }
-  }
+  while ((m = codeTagRe.exec(html)) !== null) add(m[1], m.index);
 
   // 3. Generic "show code" patterns.
   const showCodeRe = /(?:show\s*code|reveal\s*code|copy\s*code)["'>:\s]+([A-Z0-9]{4,20})/gi;
-  while ((m = showCodeRe.exec(html)) !== null) {
-    const code = m[1].toUpperCase();
-    if (isPlausibleCode(code)) {
-      found.set(code, { code, title: "", source: sourceName });
-    }
-  }
+  while ((m = showCodeRe.exec(html)) !== null) add(m[1], m.index);
 
-  return [...found.values()];
+  return [...found.values()].slice(0, CODE_CAP_PER_SOURCE);
 }
 
 // --- Individual adapters -----------------------------------------------------
@@ -118,16 +137,16 @@ async function fromCouponFollow(domain) {
 }
 
 async function fromRetailMeNot(domain) {
-  // RetailMeNot uses both a "view" route and a search route.
-  const candidates = [
+  // RetailMeNot uses both a "view" route and a search route — fetch in parallel.
+  const urls = [
     `https://www.retailmenot.com/view/${domain}`,
     `https://www.retailmenot.com/s/${domain.split(".")[0]}`,
   ];
+  const htmls = await Promise.all(urls.map(fetchText));
   const out = new Map();
-  for (const url of candidates) {
-    const html = await fetchText(url);
+  for (const html of htmls) {
     for (const c of extractCodesFromHtml(html, "RetailMeNot")) {
-      out.set(c.code, c);
+      if (!out.has(c.code)) out.set(c.code, c);
     }
   }
   return [...out.values()];
@@ -314,11 +333,46 @@ const ADAPTERS = [
 ];
 
 /**
- * Fan out to every adapter in parallel. Merge, dedupe, return sorted list.
+ * Merge every source's codes into one list, recording cross-source CONSENSUS:
+ * how many independent coupon sites listed each code. A code corroborated by
+ * many sites is far likelier to be live, so we attach `sourceCount` and sort by
+ * it — the single strongest signal an aggregator has. Generated guesses don't
+ * count toward consensus (they aren't an independent listing). Pure function so
+ * it's unit-tested directly.
+ */
+export function dedupeWithConsensus(flat) {
+  const byCode = new Map();
+  for (const c of flat || []) {
+    if (!c || !c.code) continue;
+    let rec = byCode.get(c.code);
+    if (!rec) {
+      rec = { obj: { ...c }, sources: new Set() };
+      byCode.set(c.code, rec);
+    } else {
+      // A real, listed code beats a generated guess of the same string.
+      if (rec.obj.generated && !c.generated) rec.obj = { ...c };
+      // Fill in advertised-discount info from whichever source had it.
+      if (rec.obj.pct == null && c.pct != null) rec.obj.pct = c.pct;
+      if (rec.obj.amount == null && c.amount != null) rec.obj.amount = c.amount;
+      if (!rec.obj.freeShip && c.freeShip) rec.obj.freeShip = true;
+    }
+    if (c.source && !c.generated) rec.sources.add(c.source);
+  }
+  // Keep only the count (not the source list) — leaner messages + cache.
+  const out = [...byCode.values()].map(({ obj, sources }) => ({
+    ...obj,
+    sourceCount: sources.size,
+  }));
+  out.sort((a, b) => b.sourceCount - a.sourceCount);
+  return out;
+}
+
+/**
+ * Fan out to every adapter in parallel, then merge with cross-source consensus.
  * onSourceDone is called as each adapter resolves so the UI can stream progress.
  */
 export async function gatherCoupons(domain, onSourceDone) {
-  const dedup = new Map();
+  const flat = [];
   await Promise.all(
     ADAPTERS.map(async (adapter) => {
       const name = adapter.name.replace(/^from/, "");
@@ -328,15 +382,7 @@ export async function gatherCoupons(domain, onSourceDone) {
       } catch {
         codes = [];
       }
-      for (const c of codes) {
-        const existing = dedup.get(c.code);
-        if (!existing) {
-          dedup.set(c.code, c);
-        } else if (existing.generated && !c.generated) {
-          // A real, listed code beats a generated guess of the same string.
-          dedup.set(c.code, c);
-        }
-      }
+      for (const c of codes) flat.push(c);
       if (onSourceDone) {
         try {
           onSourceDone({ source: name, found: codes.length });
@@ -344,7 +390,7 @@ export async function gatherCoupons(domain, onSourceDone) {
       }
     })
   );
-  return [...dedup.values()];
+  return dedupeWithConsensus(flat);
 }
 
 export const SOURCE_NAMES = ADAPTERS.map((a) => a.name.replace(/^from/, ""));

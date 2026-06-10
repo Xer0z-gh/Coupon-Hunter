@@ -77,15 +77,29 @@
     return true;
   }
 
-  // Merge code lists: drop generic guesses + junk, dedupe, earlier lists win.
+  // Merge code lists: drop generic guesses + junk, dedupe. When the same code
+  // shows up from two surfaces (e.g. on-page + a DB), keep the richest signal —
+  // the on-page flag, any advertised discount, and the higher consensus count.
   function mergeCodes(...lists) {
     const out = new Map();
     for (const list of lists) {
       for (const c of list || []) {
         if (c && c.generated) continue;
         const code = String((c && c.code) || "").toUpperCase();
-        if (code && isGoodCode(code) && !out.has(code)) {
+        if (!code || !isGoodCode(code)) continue;
+        const prev = out.get(code);
+        if (!prev) {
           out.set(code, Object.assign({}, c, { code }));
+        } else {
+          out.set(code, {
+            ...prev,
+            code,
+            onPage: prev.onPage || c.onPage || false,
+            pct: prev.pct != null ? prev.pct : c.pct,
+            amount: prev.amount != null ? prev.amount : c.amount,
+            freeShip: prev.freeShip || c.freeShip || false,
+            sourceCount: Math.max(prev.sourceCount || 0, c.sourceCount || 0),
+          });
         }
       }
     }
@@ -179,32 +193,60 @@
     return nums.length ? Math.max(...nums) : 0;
   }
 
-  // Upper bound in dollars a code could save: max(N%, $N), or a cap for
-  // no-number codes (free shipping etc.). Used for the provably-worse early exit.
-  function ceilSavings(code, baseline, freeShipCap) {
+  // Upper bound in dollars a code could save. Takes a code string OR a code
+  // object (with advertised pct/amount/freeShip). Always an over-estimate so
+  // the provably-worse early exit never skips a code that could win.
+  function ceilSavings(c, baseline, freeShipCap) {
     const cap = typeof freeShipCap === "number" ? freeShipCap : 30;
+    const code = typeof c === "string" ? c : (c && c.code) || "";
+    const obj = typeof c === "string" ? null : c;
+    let ceil = 0;
     const n = potentialFromCode(code);
-    if (!n) return cap;
-    return baseline != null ? Math.max(n, (n / 100) * baseline) : n;
+    if (n) ceil = baseline != null ? Math.max(n, (n / 100) * baseline) : n;
+    if (obj) {
+      if (typeof obj.pct === "number") {
+        ceil = Math.max(ceil, baseline != null ? (obj.pct / 100) * baseline : obj.pct);
+      }
+      if (typeof obj.amount === "number") ceil = Math.max(ceil, obj.amount);
+      if (obj.freeShip) ceil = Math.max(ceil, cap);
+    }
+    return ceil || cap; // no signal at all → assume a free-ship-sized win
+  }
+
+  // Expected dollars a code will save — for ordering only (not a hard bound).
+  // Prefers proven history, then the advertised discount, then a digit guess.
+  function expectedSavings(c, baseline, resultsLog) {
+    const log = resultsLog || {};
+    const r = log[c.code];
+    if (r && r.status === "working" && r.savings) return 1000 + r.savings;
+    if (typeof c.pct === "number") {
+      return baseline != null ? (c.pct / 100) * baseline : c.pct;
+    }
+    if (typeof c.amount === "number") return c.amount;
+    if (c.freeShip) return 12; // modest but real
+    return potentialFromCode(c.code);
   }
 
   // Build the try-order for the apply loop: dedupe + drop junk, then sort by
-  //   1. proven winners on this store first (by what they actually saved),
-  //   2. estimated discount from the code's digits, biggest first,
-  //   3. trust on ties: on-page > listed DB > generated guess.
+  //   1. expected savings, biggest first (proven history > advertised discount
+  //      > digit guess) — so the likely jackpot is tried first,
+  //   2. trust on ties: on-page > listed DB > generated guess,
+  //   3. cross-source consensus: more sites listing it = try it sooner.
   // Every code stays in the queue — ordering only decides who goes first.
-  function buildApplyQueue(codes, resultsLog) {
+  function buildApplyQueue(codes, resultsLog, baseline) {
     const log = resultsLog || {};
-    const potential = (c) => {
-      const r = log[c.code];
-      if (r && r.status === "working" && r.savings) return 1000 + r.savings;
-      return potentialFromCode(c.code);
-    };
     const trust = (c) => (c.onPage ? 0 : c.generated ? 2 : 1);
     const seen = new Set();
     return (codes || [])
       .filter((c) => c && isGoodCode(c.code) && !seen.has(c.code) && seen.add(c.code))
-      .sort((a, b) => potential(b) - potential(a) || trust(a) - trust(b));
+      .map((c) => ({ c, exp: expectedSavings(c, baseline, log) }))
+      .sort(
+        (a, b) =>
+          b.exp - a.exp ||
+          trust(a.c) - trust(b.c) ||
+          (b.c.sourceCount || 0) - (a.c.sourceCount || 0)
+      )
+      .map((x) => x.c);
   }
 
   // suffix[i] = the most any code from position i onward could save. Lets the
@@ -213,9 +255,10 @@
     const n = (queue || []).length;
     const suffix = new Array(n + 1).fill(0);
     for (let i = n - 1; i >= 0; i--) {
+      // Pass the whole code object so any advertised discount widens the bound.
       suffix[i] = Math.max(
         suffix[i + 1],
-        ceilSavings(queue[i].code, baseline, freeShipCap)
+        ceilSavings(queue[i], baseline, freeShipCap)
       );
     }
     return suffix;
@@ -242,6 +285,7 @@
     parseMoney,
     potentialFromCode,
     ceilSavings,
+    expectedSavings,
     buildApplyQueue,
     suffixCeilings,
   };

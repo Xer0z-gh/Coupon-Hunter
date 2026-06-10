@@ -211,7 +211,8 @@ function renderCodes() {
       <span class="state"></span>
     `;
     row.querySelector(".code").textContent = c.code;
-    row.querySelector(".src").textContent = c.source || "";
+    const extra = c.sourceCount > 1 ? ` +${c.sourceCount - 1}` : "";
+    row.querySelector(".src").textContent = (c.source || "") + extra;
     row.querySelector(".state").textContent =
       status === "working"
         ? c.savings

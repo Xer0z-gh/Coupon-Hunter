@@ -36,13 +36,16 @@ Out of the box it runs by itself. You don't press anything:
    generic guesses (`WELCOME10`, `SAVE5`…) are never tried. If nothing turns up
    on the first pass it **keeps searching** (re-hunting with backoff) until
    codes for that specific site appear.
-3. De-duplicates everything and **drops junk the moment it's scanned** (numeric
-   offer-IDs, pure-number strings and UI words never reach the list), then
-   orders codes by **potential savings** so the biggest discounts are tried
-   first — proven past winners lead, then the discount parsed from each code
-   (`SAVE40` → 40, `WELCOME10` → 10), ties broken by trust (on-page > listed
-   DB). It works through them all in that order — the only thing that ends the
-   run early is step 4 below.
+3. De-duplicates with **cross-source consensus** — it records how many
+   independent coupon sites list each code (shown as `CouponFollow +3`), the
+   strongest signal that a code is actually live. Junk is **dropped the moment
+   it's scanned** (numeric offer-IDs, pure numbers, UI words). It then orders by
+   **expected savings, biggest first**: proven past winners → the discount the
+   listing *advertises* (`30% OFF … BLACKFRIDAY` is read as 30%, not 0 just
+   because the code has no digits) → a digit guess (`SAVE40` → 40); ties broken
+   by trust (on-page > listed DB) then by how many sites corroborate it. It
+   works through them all in that order — the only thing that ends the run early
+   is step 4 below.
    For each it types the code, clicks the coupon Apply button, and resolves the
    page gives a **definitive verdict** — the total drops, or the merchant shows
    "applied" / "invalid". It never reacts to a mid-processing flicker, and it

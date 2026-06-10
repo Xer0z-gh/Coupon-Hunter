@@ -188,3 +188,33 @@ test("suffixCeilings supports the provably-worse early exit", () => {
   // Empty queue is safe.
   assert.deepEqual(C.suffixCeilings([], 100), [0]);
 });
+
+test("buildApplyQueue ranks by advertised discount over digits-in-code", () => {
+  // BLACKFRIDAY has no digits but advertises 30% — must beat SAVE10 ($10ish).
+  const codes = [
+    { code: "SAVE10" },
+    { code: "BLACKFRIDAY", pct: 30 },
+    { code: "TENOFF", amount: 25 },
+  ];
+  const q = C.buildApplyQueue(codes, {}, 200).map((c) => c.code);
+  // On a $200 cart: 30% = $60 > $25 amount > SAVE10's $10 digit guess.
+  assert.deepEqual(q, ["BLACKFRIDAY", "TENOFF", "SAVE10"]);
+});
+
+test("buildApplyQueue breaks ties by cross-source consensus", () => {
+  const codes = [
+    { code: "SAVE20", sourceCount: 1 },
+    { code: "BIG20", sourceCount: 5 }, // same potential, more sites → first
+  ];
+  const q = C.buildApplyQueue(codes, {}, 100).map((c) => c.code);
+  assert.deepEqual(q, ["BIG20", "SAVE20"]);
+});
+
+test("ceilSavings widens the bound with an advertised discount", () => {
+  // Code string says nothing (FREESHIP→0) but listing advertised 40% off.
+  assert.equal(C.ceilSavings({ code: "FREESHIP", pct: 40 }, 100), 40);
+  // $-amount advertised beats the digit guess.
+  assert.equal(C.ceilSavings({ code: "GET5", amount: 80 }, 100), 80);
+  // String form still works unchanged.
+  assert.equal(C.ceilSavings("SAVE50", 200), 100);
+});
