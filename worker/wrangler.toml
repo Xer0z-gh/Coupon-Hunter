@@ -1,0 +1,9 @@
+name = "coupon-hunter-api"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# D1 database provisioned for the community coupon collection.
+[[d1_databases]]
+binding = "DB"
+database_name = "coupon-hunter"
+database_id = "df7f037e-2aa0-4b96-8f1c-a239bd8afd0a"

@@ -21,7 +21,7 @@ core.js         Shared pure logic (domain/POS, code validation, button &
 background.js   Service worker: hunt orchestration, savings ledger, settings
 sources.js      Per-site coupon adapters (the 20 databases) + extractors
 content.js      On-page card, merchant resolution, auto-apply loop (uses core.js)
-content.css     Card styles (Apple / Cal-AI look)
+content.css     Card styles
 popup.* / welcome.*   Toolbar popup + first-run page
 tests/          Node test suite (run with `npm test`)
 ```
@@ -57,6 +57,7 @@ isolation and shared by the content script. Put new pure helpers there.
 ```
 npm run check    # syntax-check every script
 npm test         # run the unit tests in tests/
+npm run build    # build the store zip — make sure it produces a valid package
 ```
 
 Then load it unpacked and confirm a real checkout still gets a code applied.

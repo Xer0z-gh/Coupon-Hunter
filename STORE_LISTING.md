@@ -108,4 +108,4 @@ Optional promo images:
 
 ## Upload package
 
-Run `package.ps1` → upload `dist/coupon-hunter-v<version>.zip`.
+Run `npm run build` → upload `dist/coupon-hunter-v<version>.zip`.

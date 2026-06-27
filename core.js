@@ -236,6 +236,7 @@
   function buildApplyQueue(codes, resultsLog, baseline) {
     const log = resultsLog || {};
     const trust = (c) => (c.onPage ? 0 : c.generated ? 2 : 1);
+    const netVotes = (c) => (c.works || 0) - (c.fails || 0); // crowd success
     const seen = new Set();
     return (codes || [])
       .filter((c) => c && isGoodCode(c.code) && !seen.has(c.code) && seen.add(c.code))
@@ -244,6 +245,7 @@
         (a, b) =>
           b.exp - a.exp ||
           trust(a.c) - trust(b.c) ||
+          netVotes(b.c) - netVotes(a.c) ||
           (b.c.sourceCount || 0) - (a.c.sourceCount || 0)
       )
       .map((x) => x.c);

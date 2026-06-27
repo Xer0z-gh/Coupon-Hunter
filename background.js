@@ -5,7 +5,12 @@
 //   * Persist results per-domain so repeat visits show the latest known codes.
 //   * Relay progress + final results back to whichever surface asked.
 
-import { gatherCoupons, SOURCE_NAMES } from "./sources.js";
+import {
+  gatherCoupons,
+  SOURCE_NAMES,
+  submitCommunityCode,
+  submitCommunityFeedback,
+} from "./sources.js";
 
 const STORAGE_PREFIX = "cohunt:cache:";
 const DEFAULT_TTL_HOURS = 1; // keep codes fresh by default
@@ -18,10 +23,41 @@ function applyTtlHours(raw) {
   const h = parseFloat(raw);
   if (Number.isFinite(h) && h >= 1) cacheTtlMs = Math.min(h, 168) * 3600 * 1000;
 }
-chrome.storage.sync.get("optTtl").then((o) => applyTtlHours(o.optTtl)).catch(() => {});
+// Opt-in: share anonymous "this code worked/failed" feedback with the community
+// to build crowd success rates. Default OFF — sharing is always the user's call.
+let shareFeedback = false;
+chrome.storage.sync
+  .get(["optTtl", "optShareFeedback"])
+  .then((o) => {
+    applyTtlHours(o.optTtl);
+    shareFeedback = o.optShareFeedback === true;
+  })
+  .catch(() => {});
 chrome.storage.onChanged.addListener((ch, area) => {
-  if (area === "sync" && ch.optTtl) applyTtlHours(ch.optTtl.newValue);
+  if (area !== "sync") return;
+  if (ch.optTtl) applyTtlHours(ch.optTtl.newValue);
+  if (ch.optShareFeedback) shareFeedback = ch.optShareFeedback.newValue === true;
 });
+
+// Codes the user added by hand for a store (Tab 3). Stored locally and merged
+// into every hunt for that store so they're tried first-class.
+function userKey(domain) {
+  return `cohunt:user:${domain}`;
+}
+async function getUserCodes(domain) {
+  const key = userKey(domain);
+  const obj = await chrome.storage.local.get(key);
+  return obj[key] || [];
+}
+async function mergeUserCodes(domain, codes) {
+  const user = await getUserCodes(domain);
+  if (!user.length) return codes;
+  const seen = new Set(codes.map((c) => c.code));
+  const extra = user
+    .filter((u) => !seen.has(u.code))
+    .map((u) => ({ ...u, source: "Added by you", userAdded: true }));
+  return [...extra, ...codes];
+}
 
 // Hosted checkouts / processors — never pre-warm these as if they were stores.
 const POS_HOSTS = new Set([
@@ -163,14 +199,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const domain = rootDomain(msg.domain);
           if (!domain) return sendResponse({ ok: false, error: "no-domain" });
           const codes = await huntForDomain(domain, { force: !!msg.force });
-          sendResponse({ ok: true, domain, codes });
+          sendResponse({ ok: true, domain, codes: await mergeUserCodes(domain, codes) });
           break;
         }
         case "get-cached": {
           const domain = rootDomain(msg.domain);
           if (!domain) return sendResponse({ ok: false, error: "no-domain" });
           const cached = await readCache(domain);
-          sendResponse({ ok: true, domain, codes: cached?.codes || [] });
+          sendResponse({
+            ok: true,
+            domain,
+            codes: await mergeUserCodes(domain, cached?.codes || []),
+          });
           break;
         }
         case "record-result": {
@@ -199,6 +239,45 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               })
               .catch(() => {});
           }
+          // Crowd success rate — only when the user has opted in.
+          if (shareFeedback && (msg.status === "working" || msg.status === "failed")) {
+            submitCommunityFeedback(domain, msg.code, msg.status).catch(() => {});
+          }
+          sendResponse({ ok: true });
+          break;
+        }
+        case "user-add": {
+          const domain = rootDomain(msg.domain);
+          const code = String(msg.code || "").toUpperCase().trim();
+          if (!domain || !/^[A-Z0-9]{4,20}$/.test(code)) {
+            return sendResponse({ ok: false, error: "invalid" });
+          }
+          const meta = {};
+          if (Number.isFinite(msg.pct)) meta.pct = msg.pct;
+          if (Number.isFinite(msg.amount)) meta.amount = msg.amount;
+          if (msg.freeShip) meta.freeShip = true;
+          const list = await getUserCodes(domain);
+          if (!list.some((c) => c.code === code)) {
+            list.unshift({ code, ...meta, ts: Date.now() });
+            await chrome.storage.local.set({ [userKey(domain)]: list.slice(0, 100) });
+          }
+          // Explicit opt-in: also contribute it to the shared collection.
+          let shared = false;
+          if (msg.share) shared = await submitCommunityCode(domain, code, meta);
+          sendResponse({ ok: true, shared });
+          break;
+        }
+        case "user-list": {
+          const domain = rootDomain(msg.domain);
+          if (!domain) return sendResponse({ ok: true, codes: [] });
+          sendResponse({ ok: true, codes: await getUserCodes(domain) });
+          break;
+        }
+        case "user-remove": {
+          const domain = rootDomain(msg.domain);
+          const code = String(msg.code || "").toUpperCase();
+          const list = (await getUserCodes(domain)).filter((c) => c.code !== code);
+          await chrome.storage.local.set({ [userKey(domain)]: list });
           sendResponse({ ok: true });
           break;
         }

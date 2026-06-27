@@ -8,107 +8,119 @@
   </head>
   <body>
     <div class="app">
+      <!-- Top bar -->
       <header class="topbar">
-        <div class="brand">
-          <span class="spark">✦</span>
-          <span class="brand-name">Coupon Hunter</span>
-        </div>
-        <div class="topbar-actions">
-          <button class="icon-btn" id="refreshBtn" title="Re-scan the web">
-            <svg viewBox="0 0 16 16" width="14" height="14"><path d="M13.65 2.35a8 8 0 1 0 1.85 8.4l-1.6-.7a6.3 6.3 0 1 1-1.5-7.1L9.5 5.5H15V0Z" fill="currentColor"/></svg>
-          </button>
-          <button class="icon-btn" id="settingsBtn" title="Settings">
-            <svg viewBox="0 0 16 16" width="14" height="14"><path d="M8 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm5.93-1.5a5.95 5.95 0 0 0 0-2l1.7-1.3-1.5-2.6-2 .7a6 6 0 0 0-1.74-1l-.3-2.1h-3l-.3 2.1a6 6 0 0 0-1.74 1l-2-.7L1.55 5.7l1.7 1.3a5.95 5.95 0 0 0 0 2l-1.7 1.3 1.5 2.6 2-.7a6 6 0 0 0 1.74 1l.3 2.1h3l.3-2.1a6 6 0 0 0 1.74-1l2 .7 1.5-2.6Z" fill="currentColor"/></svg>
-          </button>
-        </div>
+        <div class="brand"><span class="spark">✦</span> Coupon Hunter</div>
+        <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 16 16" width="16" height="16"><path d="M8 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm5.9-1.5a6 6 0 0 0 0-2l1.7-1.3-1.5-2.6-2 .7a6 6 0 0 0-1.7-1l-.3-2.1H6.9l-.3 2.1a6 6 0 0 0-1.7 1l-2-.7L1.4 5.7l1.7 1.3a6 6 0 0 0 0 2l-1.7 1.3 1.5 2.6 2-.7a6 6 0 0 0 1.7 1l.3 2.1h3l.3-2.1a6 6 0 0 0 1.7-1l2 .7 1.5-2.6Z" fill="currentColor"/></svg>
+        </button>
       </header>
 
-      <section class="savings" id="savings">
-        <div class="savings-amt" id="savingsTotal">$0.00</div>
-        <div class="savings-cap">saved with Coupon Hunter</div>
-        <div class="savings-sub">
-          <span id="savingsCount">0</span> coupons applied ·
+      <!-- Lifetime savings hero (always visible) -->
+      <section class="hero">
+        <div class="hero-amt" id="savingsTotal">$0.00</div>
+        <div class="hero-sub">
+          saved · <span id="savingsCount">0</span> coupons ·
           <span id="savingsStores">0</span> stores
         </div>
       </section>
 
-      <section class="wins" id="wins" hidden>
-        <div class="section-label"><span>Recent wins</span></div>
-        <div class="wins-list" id="winsList"></div>
-      </section>
-
-      <section class="hero">
-        <div class="hero-domain" id="heroDomain">Loading…</div>
-        <div class="hero-prompt" id="heroPrompt">Press <kbd>↵</kbd> to hunt coupons</div>
-        <button class="primary-btn" id="huntBtn">
-          <span class="spark">✦</span>
-          <span>Find me the best coupon</span>
+      <!-- Tabs -->
+      <nav class="tabs" role="tablist">
+        <button class="tab is-active" data-tab="apply" role="tab">
+          <span class="tab-ico">🎟️</span> Apply
         </button>
-      </section>
+        <button class="tab" data-tab="scan" role="tab">
+          <span class="tab-ico">🔎</span> Scan
+        </button>
+        <button class="tab" data-tab="add" role="tab">
+          <span class="tab-ico">➕</span> Add
+        </button>
+        <span class="tab-indicator" id="tabIndicator"></span>
+      </nav>
 
-      <section class="results" id="results" hidden>
-        <div class="section-label">
-          <span>Found codes</span>
-          <span class="counter" id="counter">0</span>
+      <!-- APPLY -->
+      <section class="panel is-active" id="panel-apply">
+        <div class="site-row">
+          <span class="site-chip" id="applyDomain">this site</span>
         </div>
-        <div class="codes" id="codes"></div>
-      </section>
-
-      <section class="empty" id="empty">
-        <div class="empty-icon">✦</div>
-        <div class="empty-title">No hunt yet</div>
-        <div class="empty-sub">Click <b>Find me the best coupon</b> to scan 10+ coupon sites for this shop.</div>
-      </section>
-
-      <section class="progress" id="progress" hidden>
-        <div class="progress-label" id="progressLabel">Scanning…</div>
-        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-        <ul class="source-list" id="sourceList"></ul>
-      </section>
-
-      <footer class="footer">
-        <button class="ghost-btn" id="autoApplyBtn" disabled>
-          <span>Auto-apply on this page</span>
-          <span class="kbd">⌥ ↵</span>
+        <button class="cta" id="applyBtn">
+          <span class="spark">✦</span> Apply best code on this page
         </button>
-        <div class="footer-meta" id="footerMeta">Idle</div>
-      </footer>
+        <div class="list" id="applyList"></div>
+        <div class="hint" id="applyHint">Loading saved codes for this store…</div>
+        <div class="wins" id="wins" hidden>
+          <div class="list-label">Recent wins</div>
+          <div class="wins-list" id="winsList"></div>
+        </div>
+      </section>
+
+      <!-- SCAN -->
+      <section class="panel" id="panel-scan" hidden>
+        <p class="blurb">Check any store for live coupons — 20+ databases plus the community collection.</p>
+        <div class="field-row">
+          <input class="text-input" id="scanDomain" placeholder="store.com" autocomplete="off" />
+          <button class="btn-primary" id="scanBtn">Scan</button>
+        </div>
+        <div class="scanbar" id="scanBar" hidden>
+          <div class="scanbar-fill" id="scanFill"></div>
+        </div>
+        <div class="scan-status" id="scanStatus"></div>
+        <div class="list" id="scanList"></div>
+      </section>
+
+      <!-- ADD -->
+      <section class="panel" id="panel-add" hidden>
+        <p class="blurb">Know a code that works? Add it so it's tried first — and optionally share it with everyone.</p>
+        <div class="add-form">
+          <input class="text-input mono" id="addCode" placeholder="CODE20" maxlength="20" autocomplete="off" />
+          <div class="field-row">
+            <select class="select" id="addType">
+              <option value="none">No discount info</option>
+              <option value="pct">% off</option>
+              <option value="amount">$ off</option>
+              <option value="free">Free shipping</option>
+            </select>
+            <input class="text-input" id="addValue" type="number" min="1" placeholder="20" />
+          </div>
+          <div class="add-site">for <b id="addDomain">this site</b></div>
+          <label class="check">
+            <input type="checkbox" id="addShare" />
+            <span>Share with the community <span class="muted">(anonymous, helps everyone)</span></span>
+          </label>
+          <button class="btn-primary full" id="addBtn">Add coupon</button>
+          <div class="add-msg" id="addMsg"></div>
+        </div>
+        <div class="list-label" id="myCodesLabel" hidden>Your codes for this store</div>
+        <div class="list" id="myCodes"></div>
+      </section>
+
+      <footer class="footer"><span id="footerMeta">Ready</span></footer>
     </div>
 
-    <div class="settings-sheet" id="settingsSheet" hidden>
+    <!-- Settings sheet -->
+    <div class="sheet" id="settingsSheet" hidden>
       <div class="sheet-head">
         <span>Settings</span>
         <button class="icon-btn" id="closeSettings" aria-label="Close">×</button>
       </div>
       <div class="sheet-body">
-        <label class="setting-row">
-          <span>Coupon Hunter enabled</span>
-          <input type="checkbox" id="optEnabled" />
+        <label class="row"><span>Coupon Hunter enabled</span><input type="checkbox" id="optEnabled" /></label>
+        <label class="row"><span>Pause on <b id="pauseDomain">this site</b></span><input type="checkbox" id="optPauseSite" /></label>
+        <div class="divider"></div>
+        <label class="row"><span>Auto-hunt on every page</span><input type="checkbox" id="optAutoHunt" /></label>
+        <label class="row"><span>Auto-apply at checkout</span><input type="checkbox" id="optAutoApply" /></label>
+        <label class="row"><span>Show floating card</span><input type="checkbox" id="optFloatCard" /></label>
+        <div class="divider"></div>
+        <label class="row">
+          <span>Share which codes worked <span class="muted">(anonymous)</span></span>
+          <input type="checkbox" id="optShareFeedback" />
         </label>
-        <label class="setting-row">
-          <span>Pause on <b id="pauseDomain">this site</b></span>
-          <input type="checkbox" id="optPauseSite" />
-        </label>
-        <div class="sheet-divider"></div>
-        <label class="setting-row">
-          <span>Auto-hunt on every page load</span>
-          <input type="checkbox" id="optAutoHunt" />
-        </label>
-        <label class="setting-row">
-          <span>Auto-apply when checkout detected</span>
-          <input type="checkbox" id="optAutoApply" />
-        </label>
-        <label class="setting-row">
-          <span>Show floating card on merchant pages</span>
-          <input type="checkbox" id="optFloatCard" checked />
-        </label>
-        <label class="setting-row">
-          <span>Cache TTL (hours)</span>
-          <input type="number" id="optTtl" min="1" max="168" value="6" />
-        </label>
-        <button class="ghost-btn full" id="clearCache">Clear cached codes</button>
-        <button class="ghost-btn full" id="resetSavings">Reset savings counter</button>
-        <a class="sheet-link" id="sourceLink" href="https://github.com/Xer0z-gh/coupon-hunter" target="_blank" rel="noopener">★ Star us on GitHub — free &amp; open source</a>
+        <label class="row"><span>Cache codes for (hours)</span><input type="number" id="optTtl" min="1" max="168" /></label>
+        <div class="divider"></div>
+        <button class="btn-ghost full" id="clearCache">Clear cached codes</button>
+        <button class="btn-ghost full" id="resetSavings">Reset savings counter</button>
+        <a class="sheet-link" id="sourceLink" href="https://github.com/Xer0z-gh/coupon-hunter" target="_blank" rel="noopener">★ Free &amp; open source on GitHub</a>
       </div>
     </div>
 

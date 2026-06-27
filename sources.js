@@ -16,6 +16,67 @@ const COMMON_HEADERS = {
 
 const FETCH_TIMEOUT_MS = 8000;
 
+// Community coupon API (Cloudflare Worker — see worker/README.md). Set this to
+// your deployed Worker URL to turn on the shared collection; empty = disabled,
+// and everything else works exactly the same.
+export const API_BASE = "";
+
+async function fetchJson(url, opts) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal, ...opts });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// Community-shared codes for a domain, with crowd works/fails counts.
+export async function fromCommunity(domain) {
+  if (!API_BASE) return [];
+  const data = await fetchJson(
+    `${API_BASE}/v1/coupons?domain=${encodeURIComponent(domain)}`
+  );
+  if (!data || !data.ok || !Array.isArray(data.codes)) return [];
+  return data.codes
+    .filter((c) => isPlausibleCode(String(c.code || "").toUpperCase()))
+    .map((c) => ({
+      code: String(c.code).toUpperCase(),
+      source: "Community",
+      pct: c.pct,
+      amount: c.amount,
+      freeShip: c.freeShip,
+      works: c.works || 0,
+      fails: c.fails || 0,
+    }));
+}
+
+// Contribute a code to the shared collection (explicit opt-in only).
+export async function submitCommunityCode(domain, code, meta = {}) {
+  if (!API_BASE) return false;
+  const r = await fetchJson(`${API_BASE}/v1/coupons`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ domain, code, ...meta }),
+  });
+  return !!(r && r.ok);
+}
+
+// Report whether a code worked, to build the crowd success rate (opt-in).
+export async function submitCommunityFeedback(domain, code, status) {
+  if (!API_BASE) return false;
+  const r = await fetchJson(`${API_BASE}/v1/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ domain, code, status }),
+  });
+  return !!(r && r.ok);
+}
+
 async function fetchText(url) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -309,6 +370,7 @@ async function fromGoogleSearch(domain) {
 }
 
 const ADAPTERS = [
+  fromCommunity,
   fromCouponFollow,
   fromRetailMeNot,
   fromCouponsCom,

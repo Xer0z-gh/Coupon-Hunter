@@ -1,6 +1,6 @@
 # Privacy Policy — Coupon Hunter
 
-_Last updated: 2026-06-09_
+_Last updated: 2026-06-27_
 
 Coupon Hunter is a free, open-source browser extension. Your privacy is the
 default, not a setting.
@@ -8,11 +8,14 @@ default, not a setting.
 ## The short version
 
 - **No accounts. No tracking. No analytics. No ads.**
-- **Nothing about you leaves your browser** except anonymous requests to public
-  coupon websites for the store you're actively shopping on.
 - Everything the extension remembers (your savings total, settings, cached
-  codes) is stored **locally in your own browser** via the standard extension
-  storage APIs.
+  codes) is stored **locally in your own browser**.
+- The only data that ever leaves your browser is: (a) the **store's domain**
+  when looking up coupons (the same thing happens with any coupon site), and
+  (b) **only if you choose to**, a coupon code you explicitly share with the
+  community, or anonymous "this code worked/didn't" feedback if you opt in.
+- We never collect personal info, payment details, cart contents, or browsing
+  history — ever.
 
 ## What the extension does on a page
 
@@ -33,9 +36,27 @@ When you reach a cart/checkout page that has a coupon field, Coupon Hunter:
   addresses, or personal information**.
 - It never sends your **browsing history, cart contents, or the pages you
   visit** to any server.
-- It has **no backend** owned by the project — there is no server collecting
-  anything. The only network requests are to the public coupon sites listed in
-  `sources.js`.
+
+## The community collection (optional)
+
+Coupon Hunter has an optional shared collection so codes that work for one
+person can help everyone. It's anonymous and on your terms:
+
+- **Looking up community codes** sends only the **store domain** to the Coupon
+  Hunter API — exactly like a lookup to any other coupon site. No identity, no
+  cart, no page contents.
+- **Sharing a code** only happens when you tick "Share with the community" while
+  adding a code. It sends `{ store domain, the code, optional discount }` — and
+  nothing else.
+- **Crowd success rate** ("worked for 87% of people") is built from anonymous
+  "worked / didn't work" reports. This is **off by default**; it's only sent if
+  you enable "Share which codes worked" in Settings. The report is
+  `{ store domain, code, worked or failed }` — no identity attached.
+- The API stores **no personal data** — only `(domain, code, discount, works,
+  fails)`. The server code is open source under `worker/`.
+
+If you never enable sharing and never tick the share box, the only thing that
+leaves your browser is the domain lookups above.
 
 ## What's stored locally (and only locally)
 

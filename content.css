@@ -1,6 +1,6 @@
 /* Coupon Hunter on-page card.
-   Apple / Cal AI aesthetic: clean white surface, big soft corners, gentle
-   shadow, rounded friendly type, pill rows, black pill primary button. */
+   Clean white surface, large corner radii, soft shadow, pill rows,
+   dark pill primary button. Adapts to system dark mode. */
 
 #cohunt-card {
   position: fixed;
@@ -297,7 +297,7 @@
   color: #1c1c1e;
 }
 
-/* -------- Dark mode (Cal AI dark surfaces) -------- */
+/* -------- Dark mode -------- */
 @media (prefers-color-scheme: dark) {
   #cohunt-card {
     background: #1c1c1e;
