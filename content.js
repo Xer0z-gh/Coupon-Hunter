@@ -342,22 +342,59 @@
         </div>
       </div>
 
-      <div class="cohunt-meta">
-        <span class="cohunt-domain" data-cohunt-domain></span>
-        <span class="cohunt-status" data-cohunt-status>Looking around…</span>
+      <div class="cohunt-tabs" role="tablist">
+        <button class="cohunt-tab cohunt-tab-active" data-tab="apply" role="tab">Apply</button>
+        <button class="cohunt-tab" data-tab="scan" role="tab">Scan</button>
+        <button class="cohunt-tab" data-tab="add" role="tab">Add</button>
+        <span class="cohunt-tab-ind" data-tab-ind></span>
       </div>
 
-      <div class="cohunt-progress" data-cohunt-progress hidden>
-        <div class="cohunt-progress-fill" data-cohunt-progress-fill></div>
+      <div class="cohunt-panel" data-panel="apply">
+        <div class="cohunt-meta">
+          <span class="cohunt-domain" data-cohunt-domain></span>
+          <span class="cohunt-status" data-cohunt-status>Looking around…</span>
+        </div>
+        <div class="cohunt-progress" data-cohunt-progress hidden>
+          <div class="cohunt-progress-fill" data-cohunt-progress-fill></div>
+        </div>
+        <ul class="cohunt-list" data-cohunt-list></ul>
+        <div class="cohunt-foot">
+          <button class="cohunt-apply" data-cohunt-apply>Auto-apply best code</button>
+          <button class="cohunt-refresh" data-cohunt-refresh title="Re-scan" aria-label="Re-scan">
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M13.65 2.35a8 8 0 1 0 1.85 8.4l-1.6-.7a6.3 6.3 0 1 1-1.5-7.1L9.5 5.5H15V0Z" fill="currentColor"/></svg>
+          </button>
+        </div>
       </div>
 
-      <ul class="cohunt-list" data-cohunt-list></ul>
+      <div class="cohunt-panel" data-panel="scan" hidden>
+        <div class="cohunt-blurb">Check any store for live coupons.</div>
+        <div class="cohunt-field-row">
+          <input class="cohunt-input" data-scan-input placeholder="store.com" autocomplete="off" />
+          <button class="cohunt-btn" data-scan-btn>Scan</button>
+        </div>
+        <div class="cohunt-progress" data-scan-progress hidden>
+          <div class="cohunt-progress-fill cohunt-indeterminate" data-scan-fill></div>
+        </div>
+        <div class="cohunt-status" data-scan-status></div>
+        <ul class="cohunt-list" data-scan-list></ul>
+      </div>
 
-      <div class="cohunt-foot">
-        <button class="cohunt-apply" data-cohunt-apply>Auto-apply best code</button>
-        <button class="cohunt-refresh" data-cohunt-refresh title="Re-scan" aria-label="Re-scan">
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M13.65 2.35a8 8 0 1 0 1.85 8.4l-1.6-.7a6.3 6.3 0 1 1-1.5-7.1L9.5 5.5H15V0Z" fill="currentColor"/></svg>
-        </button>
+      <div class="cohunt-panel" data-panel="add" hidden>
+        <div class="cohunt-blurb">Know a code that works? Add it so it's tried first<span data-add-for></span>.</div>
+        <input class="cohunt-input cohunt-mono" data-add-code placeholder="CODE20" maxlength="20" autocomplete="off" />
+        <div class="cohunt-field-row">
+          <select class="cohunt-input" data-add-type>
+            <option value="none">No discount info</option>
+            <option value="pct">% off</option>
+            <option value="amount">$ off</option>
+            <option value="free">Free shipping</option>
+          </select>
+          <input class="cohunt-input" data-add-value type="number" min="1" placeholder="20" />
+        </div>
+        <label class="cohunt-check"><input type="checkbox" data-add-share checked /> Share with the community</label>
+        <button class="cohunt-btn cohunt-btn-full" data-add-btn>Add coupon</button>
+        <div class="cohunt-add-msg" data-add-msg></div>
+        <ul class="cohunt-list" data-my-codes></ul>
       </div>
     </div>
   `;
@@ -370,6 +407,145 @@
   $("[data-cohunt-pill]").addEventListener("click", () => expandCard());
   $("[data-cohunt-refresh]").addEventListener("click", () => startHunt({ force: true }));
   $("[data-cohunt-apply]").addEventListener("click", () => autoApplyLoop());
+
+  // -- Tabs (Apply / Scan / Add) ----------------------------------------------
+  const TAB_ORDER = ["apply", "scan", "add"];
+  function switchCardTab(name) {
+    const idx = Math.max(0, TAB_ORDER.indexOf(name));
+    card.querySelectorAll(".cohunt-tab").forEach((t) =>
+      t.classList.toggle("cohunt-tab-active", t.dataset.tab === name)
+    );
+    card.querySelectorAll(".cohunt-panel").forEach((p) => {
+      p.hidden = p.dataset.panel !== name;
+    });
+    $("[data-tab-ind]").style.transform = `translateX(${idx * 100}%)`;
+    if (name === "scan") {
+      const inp = $("[data-scan-input]");
+      if (!inp.value) inp.value = huntDomain || resolveMerchant() || "";
+      inp.focus();
+    }
+    if (name === "add") {
+      const m = huntDomain || resolveMerchant();
+      $("[data-add-for]").textContent = m ? ` for ${m}` : "";
+      loadMyCodes();
+    }
+  }
+  card.querySelectorAll(".cohunt-tab").forEach((t) =>
+    t.addEventListener("click", () => switchCardTab(t.dataset.tab))
+  );
+
+  // -- Scan tab ---------------------------------------------------------------
+  $("[data-scan-btn]").addEventListener("click", runScan);
+  $("[data-scan-input]").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runScan();
+  });
+  async function runScan() {
+    const domain = rootDomainOf($("[data-scan-input]").value.trim());
+    if (!domain) {
+      $("[data-scan-status]").textContent = "Enter a store domain first.";
+      return;
+    }
+    const btn = $("[data-scan-btn]");
+    btn.disabled = true;
+    $("[data-scan-progress]").hidden = false;
+    $("[data-scan-status]").textContent = `Scanning the web for ${domain}…`;
+    $("[data-scan-list]").innerHTML = "";
+    const res = await safeSend({ type: "hunt", domain, force: true });
+    btn.disabled = false;
+    $("[data-scan-progress]").hidden = true;
+    const codes = (res && res.codes) || [];
+    $("[data-scan-status]").textContent = codes.length
+      ? `Found ${codes.length} code${codes.length > 1 ? "s" : ""} for ${domain}.`
+      : `No codes found for ${domain} yet.`;
+    renderSimpleList($("[data-scan-list]"), codes);
+  }
+
+  // -- Add tab ----------------------------------------------------------------
+  $("[data-add-btn]").addEventListener("click", addUserCode);
+  $("[data-add-code]").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addUserCode();
+  });
+  async function addUserCode() {
+    const msg = $("[data-add-msg]");
+    const code = $("[data-add-code]").value.toUpperCase().trim();
+    const domain = huntDomain || resolveMerchant();
+    if (!/^[A-Z0-9]{4,20}$/.test(code)) {
+      msg.className = "cohunt-add-msg cohunt-err";
+      msg.textContent = "Enter a code (4–20 letters/numbers).";
+      return;
+    }
+    if (!domain) {
+      msg.className = "cohunt-add-msg cohunt-err";
+      msg.textContent = "Couldn't tell which store this is.";
+      return;
+    }
+    const type = $("[data-add-type]").value;
+    const val = parseInt($("[data-add-value]").value, 10);
+    const payload = { type: "user-add", domain, code, share: $("[data-add-share]").checked };
+    if (type === "pct" && val >= 1) payload.pct = Math.min(95, val);
+    else if (type === "amount" && val >= 1) payload.amount = val;
+    else if (type === "free") payload.freeShip = true;
+    const res = await safeSend(payload);
+    if (res?.ok) {
+      msg.className = "cohunt-add-msg cohunt-ok";
+      msg.textContent = res.shared ? "Added & shared 🎉" : "Added — it'll be tried first here.";
+      $("[data-add-code]").value = "";
+      $("[data-add-value]").value = "";
+      loadMyCodes();
+    } else {
+      msg.className = "cohunt-add-msg cohunt-err";
+      msg.textContent = "Couldn't add that code.";
+    }
+  }
+  async function loadMyCodes() {
+    const domain = huntDomain || resolveMerchant();
+    if (!domain) return;
+    const res = await safeSend({ type: "user-list", domain });
+    renderSimpleList(
+      $("[data-my-codes]"),
+      (res && res.codes) || [],
+      (c) => removeUserCode(domain, c.code)
+    );
+  }
+  async function removeUserCode(domain, code) {
+    await safeSend({ type: "user-remove", domain, code });
+    loadMyCodes();
+  }
+
+  // Shared compact renderer for the Scan + Add lists (plain code · meta rows).
+  function renderSimpleList(ul, codes, onRemove) {
+    ul.innerHTML = "";
+    for (const c of codes.slice(0, 30)) {
+      const li = document.createElement("li");
+      li.className = "cohunt-item";
+      const code = document.createElement("code");
+      code.className = "cohunt-code";
+      code.textContent = c.code;
+      code.title = "Click to copy";
+      code.addEventListener("click", () => {
+        navigator.clipboard?.writeText(c.code);
+      });
+      const meta = document.createElement("span");
+      meta.className = "cohunt-source";
+      meta.textContent = c.pct
+        ? `${c.pct}% off`
+        : c.amount
+        ? `$${c.amount} off`
+        : c.freeShip
+        ? "free ship"
+        : (c.source || "") + (c.sourceCount > 1 ? ` +${c.sourceCount - 1}` : "");
+      li.append(code, meta);
+      if (onRemove) {
+        const x = document.createElement("button");
+        x.className = "cohunt-rm";
+        x.textContent = "×";
+        x.title = "Remove";
+        x.addEventListener("click", () => onRemove(c));
+        li.appendChild(x);
+      }
+      ul.appendChild(li);
+    }
+  }
 
   function showCard() {
     card.style.display = "block";

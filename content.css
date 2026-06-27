@@ -128,6 +128,157 @@
   color: rgba(0, 0, 0, 0.45);
 }
 
+/* -------- Tabs -------- */
+.cohunt-tabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  margin: 0 6px 8px;
+  padding: 4px;
+  background: #f0f0f2;
+  border-radius: 14px;
+}
+.cohunt-tab {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+  padding: 8px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 160ms;
+}
+.cohunt-tab-active {
+  color: #1c1c1e;
+}
+.cohunt-tab-ind {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  height: calc(100% - 8px);
+  width: calc((100% - 8px) / 3);
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cohunt-panel[hidden] {
+  display: none;
+}
+.cohunt-blurb {
+  padding: 2px 14px 8px;
+  font-size: 12.5px;
+  color: rgba(0, 0, 0, 0.55);
+  line-height: 1.45;
+}
+
+/* -------- Inputs / buttons (Scan + Add) -------- */
+.cohunt-field-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px 8px;
+}
+.cohunt-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  background: #f5f5f7;
+  color: #1c1c1e;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13.5px;
+  outline: none;
+  margin: 0 8px 8px;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.cohunt-field-row .cohunt-input {
+  margin: 0;
+}
+.cohunt-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.cohunt-mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cohunt-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 120ms, transform 120ms;
+}
+.cohunt-btn:hover {
+  filter: brightness(1.07);
+}
+.cohunt-btn:active {
+  transform: scale(0.98);
+}
+.cohunt-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.cohunt-btn-full {
+  width: calc(100% - 16px);
+  margin: 0 8px 6px;
+}
+.cohunt-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 10px;
+  font-size: 12.5px;
+  color: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+}
+.cohunt-add-msg {
+  padding: 0 8px 6px;
+  font-size: 12.5px;
+  min-height: 14px;
+}
+.cohunt-add-msg.cohunt-ok {
+  color: #0f7a52;
+}
+.cohunt-add-msg.cohunt-err {
+  color: #d8492f;
+}
+.cohunt-indeterminate {
+  width: 40% !important;
+  animation: cohunt-slide 1.1s ease-in-out infinite;
+}
+@keyframes cohunt-slide {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+.cohunt-rm {
+  background: none;
+  border: none;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+.cohunt-rm:hover {
+  color: #1c1c1e;
+  background: rgba(0, 0, 0, 0.06);
+}
+
 /* -------- Meta / status -------- */
 .cohunt-meta {
   display: flex;
@@ -321,6 +472,34 @@
   .cohunt-stat,
   .cohunt-domain {
     background: #2c2c2e;
+  }
+  .cohunt-tabs {
+    background: #2c2c2e;
+  }
+  .cohunt-tab {
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .cohunt-tab-active {
+    color: #ffffff;
+  }
+  .cohunt-tab-ind {
+    background: #3a3a3c;
+  }
+  .cohunt-blurb,
+  .cohunt-check {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .cohunt-input {
+    background: #2c2c2e;
+    color: #f5f5f7;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .cohunt-add-msg.cohunt-ok {
+    color: #34d27b;
+  }
+  .cohunt-rm:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
   }
   .cohunt-stat-value {
     color: #ffffff;
