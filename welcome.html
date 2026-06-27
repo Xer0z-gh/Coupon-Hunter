@@ -29,10 +29,8 @@
         display: flex; align-items: center; gap: 10px;
         font-weight: 800; font-size: 20px; letter-spacing: -0.02em;
       }
-      .spark {
-        background: var(--grad); -webkit-background-clip: text;
-        background-clip: text; -webkit-text-fill-color: transparent; font-size: 22px;
-      }
+      .spark { width: 24px; height: 24px; vertical-align: -5px; }
+      .cta .spark { width: 18px; height: 18px; vertical-align: -3px; }
       h1 { font-size: 40px; letter-spacing: -0.035em; margin: 28px 0 10px; line-height: 1.08; }
       .lede { font-size: 18px; color: var(--muted); margin: 0 0 8px; line-height: 1.5; }
       .free {
@@ -69,8 +67,19 @@
     </style>
   </head>
   <body>
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+      <defs>
+        <linearGradient id="chGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2563eb" />
+          <stop offset="1" stop-color="#10b981" />
+        </linearGradient>
+        <symbol id="ic-spark" viewBox="0 0 24 24">
+          <path fill="url(#chGrad)" d="M12 0C12 6.6 6.6 12 0 12 6.6 12 12 17.4 12 24 12 17.4 17.4 12 24 12 17.4 12 12 6.6 12 0Z" />
+        </symbol>
+      </defs>
+    </svg>
     <div class="wrap">
-      <div class="brand"><span class="spark">✦</span> Coupon Hunter</div>
+      <div class="brand"><svg class="spark" aria-hidden="true"><use href="#ic-spark" /></svg> Coupon Hunter</div>
 
       <h1>Never overpay at checkout again.</h1>
       <p class="lede">
@@ -109,7 +118,7 @@
         </div>
       </div>
 
-      <button class="cta" id="done"><span class="spark">✦</span> Start saving</button>
+      <button class="cta" id="done"><svg class="spark" aria-hidden="true"><use href="#ic-spark" /></svg> Start saving</button>
 
       <div class="priv">
         <b>Your privacy:</b> No accounts, no tracking, and your cart, payment details,

@@ -234,7 +234,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               ?.create({
                 type: "basic",
                 iconUrl: "icons/icon128.png",
-                title: "Coupon Hunter saved you money 🎉",
+                title: "Coupon Hunter saved you money",
                 message: `${msg.code} took $${msg.savings.toFixed(2)} off at ${domain}.`,
                 priority: 2,
               })

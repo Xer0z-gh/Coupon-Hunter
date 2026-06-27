@@ -315,14 +315,25 @@
   card.id = "cohunt-card";
   card.setAttribute("data-cohunt", "1");
   card.innerHTML = `
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+      <defs>
+        <linearGradient id="cohunt-grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2563eb" />
+          <stop offset="1" stop-color="#10b981" />
+        </linearGradient>
+        <symbol id="cohunt-spk" viewBox="0 0 24 24">
+          <path fill="url(#cohunt-grad)" d="M12 0C12 6.6 6.6 12 0 12 6.6 12 12 17.4 12 24 12 17.4 17.4 12 24 12 17.4 12 12 6.6 12 0Z" />
+        </symbol>
+      </defs>
+    </svg>
     <button class="cohunt-pill" data-cohunt-pill hidden>
-      <span class="cohunt-spark">✦</span>
+      <svg class="cohunt-spark" aria-hidden="true"><use href="#cohunt-spk" /></svg>
       <span data-cohunt-pill-text>Coupon Hunter</span>
     </button>
     <div class="cohunt-card-inner">
       <header class="cohunt-head">
         <div class="cohunt-brand">
-          <span class="cohunt-spark">✦</span>
+          <svg class="cohunt-spark" aria-hidden="true"><use href="#cohunt-spk" /></svg>
           <span class="cohunt-title">Coupon Hunter</span>
         </div>
         <div class="cohunt-head-actions">
@@ -488,7 +499,7 @@
     const res = await safeSend(payload);
     if (res?.ok) {
       msg.className = "cohunt-add-msg cohunt-ok";
-      msg.textContent = res.shared ? "Added & shared 🎉" : "Added — it'll be tried first here.";
+      msg.textContent = res.shared ? "Added and shared." : "Added — it'll be tried first here.";
       $("[data-add-code]").value = "";
       $("[data-add-value]").value = "";
       loadMyCodes();
@@ -619,7 +630,7 @@
         <span class="cohunt-source"></span>
         <span class="cohunt-state">${
           state === "working"
-            ? "Saved ✓"
+            ? "Saved"
             : state === "failed"
             ? "Invalid"
             : state === "trying"
@@ -706,7 +717,7 @@
   function scheduleRetryHunt() {
     if (retryPending || dead) return;
     if (retryAttempts >= MAX_RETRIES) {
-      setStatus(`No codes found for ${huntDomain} yet — click ↻ to keep looking.`);
+      setStatus(`No codes found for ${huntDomain} yet — click refresh to keep looking.`);
       return;
     }
     retryAttempts++;
@@ -848,11 +859,11 @@
         setStats(best.savings, workingCount);
         card.classList.add("cohunt-success");
         if (best.savings) {
-          setStatus(`All done — ${best.code} saved you $${best.savings.toFixed(2)} 🎉`);
-          autoCollapseSoon(`✓ Saved $${best.savings.toFixed(2)}`);
+          setStatus(`All done — ${best.code} saved you $${best.savings.toFixed(2)}.`);
+          autoCollapseSoon(`Saved $${best.savings.toFixed(2)}`);
         } else {
           setStatus(`All done — applied ${best.code}.`);
-          autoCollapseSoon(`✓ ${best.code} applied`);
+          autoCollapseSoon(`${best.code} applied`);
         }
       } else {
         // Never leave a junk code in the box — clear it back out.
@@ -860,10 +871,10 @@
         // The Honey-style reassurance: a clean "nothing left on the table".
         setStatus(
           tested > 0
-            ? `We tested ${tested} code${tested > 1 ? "s" : ""} — you already have the best price. ✓`
+            ? `We tested ${tested} code${tested > 1 ? "s" : ""} — you already have the best price.`
             : "No working code this time — cleared the box for you."
         );
-        autoCollapseSoon("✓ Best price");
+        autoCollapseSoon("Best price");
       }
     } finally {
       applyInFlight = false;

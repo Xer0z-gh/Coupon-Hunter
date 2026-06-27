@@ -49,11 +49,9 @@ html, body {
 }
 .app { display: flex; flex-direction: column; min-height: 440px; max-height: 600px; }
 
-.spark {
-  background: var(--grad);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
+.spark { width: 1.05em; height: 1.05em; vertical-align: -0.16em; flex: none; }
+.tab-ico { width: 15px; height: 15px; vertical-align: -0.2em; }
+.ic-inline { width: 14px; height: 14px; vertical-align: -0.18em; }
 
 /* Top bar */
 .topbar {
@@ -92,7 +90,6 @@ html, body {
   padding: 8px 6px; border-radius: 10px; transition: color 160ms;
 }
 .tab.is-active { color: var(--text); }
-.tab-ico { font-size: 13px; }
 .tab-indicator {
   position: absolute; top: 4px; left: 4px; height: calc(100% - 8px);
   width: calc((100% - 8px) / 3);
@@ -123,7 +120,6 @@ html, body {
   padding: 13px 16px; border-radius: 999px; box-shadow: var(--shadow);
   transition: transform 120ms, opacity 120ms;
 }
-.cta .spark { -webkit-text-fill-color: initial; background: none; }
 .cta:hover { transform: translateY(-1px); }
 .cta:active { transform: scale(0.99); }
 .cta[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }

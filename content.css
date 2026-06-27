@@ -68,11 +68,10 @@
 }
 
 .cohunt-spark {
-  font-size: 15px;
-  background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  width: 15px;
+  height: 15px;
+  vertical-align: -2px;
+  flex: none;
 }
 
 .cohunt-close {

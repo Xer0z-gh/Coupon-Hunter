@@ -7,10 +7,35 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+      <defs>
+        <linearGradient id="chGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2563eb" />
+          <stop offset="1" stop-color="#10b981" />
+        </linearGradient>
+        <symbol id="ic-spark" viewBox="0 0 24 24">
+          <path fill="url(#chGrad)" d="M12 0C12 6.6 6.6 12 0 12 6.6 12 12 17.4 12 24 12 17.4 17.4 12 24 12 17.4 12 12 6.6 12 0Z" />
+        </symbol>
+        <symbol id="ic-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12.5V5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 1.4.6l6.5 6.5a2 2 0 0 1 0 2.8l-7.5 7.5a2 2 0 0 1-2.8 0L3.6 13.9A2 2 0 0 1 3 12.5Z" />
+          <circle cx="7.5" cy="7.5" r="1.4" />
+        </symbol>
+        <symbol id="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.3-4.3" />
+        </symbol>
+        <symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="ic-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9L12 3.5Z" />
+        </symbol>
+      </defs>
+    </svg>
     <div class="app">
       <!-- Top bar -->
       <header class="topbar">
-        <div class="brand"><span class="spark">✦</span> Coupon Hunter</div>
+        <div class="brand"><svg class="spark" aria-hidden="true"><use href="#ic-spark" /></svg> Coupon Hunter</div>
         <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">
           <svg viewBox="0 0 16 16" width="16" height="16"><path d="M8 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm5.9-1.5a6 6 0 0 0 0-2l1.7-1.3-1.5-2.6-2 .7a6 6 0 0 0-1.7-1l-.3-2.1H6.9l-.3 2.1a6 6 0 0 0-1.7 1l-2-.7L1.4 5.7l1.7 1.3a6 6 0 0 0 0 2l-1.7 1.3 1.5 2.6 2-.7a6 6 0 0 0 1.7 1l.3 2.1h3l.3-2.1a6 6 0 0 0 1.7-1l2 .7 1.5-2.6Z" fill="currentColor"/></svg>
         </button>
@@ -28,13 +53,13 @@
       <!-- Tabs -->
       <nav class="tabs" role="tablist">
         <button class="tab is-active" data-tab="apply" role="tab">
-          <span class="tab-ico">🎟️</span> Apply
+          <svg class="tab-ico" aria-hidden="true"><use href="#ic-tag" /></svg> Apply
         </button>
         <button class="tab" data-tab="scan" role="tab">
-          <span class="tab-ico">🔎</span> Scan
+          <svg class="tab-ico" aria-hidden="true"><use href="#ic-search" /></svg> Scan
         </button>
         <button class="tab" data-tab="add" role="tab">
-          <span class="tab-ico">➕</span> Add
+          <svg class="tab-ico" aria-hidden="true"><use href="#ic-plus" /></svg> Add
         </button>
         <span class="tab-indicator" id="tabIndicator"></span>
       </nav>
@@ -45,7 +70,7 @@
           <span class="site-chip" id="applyDomain">this site</span>
         </div>
         <button class="cta" id="applyBtn">
-          <span class="spark">✦</span> Apply best code on this page
+          <svg class="spark" aria-hidden="true"><use href="#ic-spark" /></svg> Apply best code on this page
         </button>
         <div class="list" id="applyList"></div>
         <div class="hint" id="applyHint">Loading saved codes for this store…</div>
@@ -120,7 +145,7 @@
         <div class="divider"></div>
         <button class="btn-ghost full" id="clearCache">Clear cached codes</button>
         <button class="btn-ghost full" id="resetSavings">Reset savings counter</button>
-        <a class="sheet-link" id="sourceLink" href="https://github.com/Xer0z-gh/coupon-hunter" target="_blank" rel="noopener">★ Free &amp; open source on GitHub</a>
+        <a class="sheet-link" id="sourceLink" href="https://github.com/Xer0z-gh/coupon-hunter" target="_blank" rel="noopener"><svg class="ic-inline" aria-hidden="true"><use href="#ic-star" /></svg> Free &amp; open source on GitHub</a>
       </div>
     </div>
 

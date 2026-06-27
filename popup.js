@@ -127,9 +127,12 @@ function renderCodeList(container, codes, emptyMsg) {
     const works = c.works || 0;
     const fails = c.fails || 0;
     if (works + fails > 0) {
-      row.appendChild(
-        el("span", "row-badge", `👍 ${Math.round((works / (works + fails)) * 100)}% · ${works}`)
-      );
+      const badge = el("span", "row-badge");
+      const rate = Math.round((works / (works + fails)) * 100);
+      badge.innerHTML =
+        '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M5 12.5l4.5 4.5L19 7"/></svg> ';
+      badge.appendChild(document.createTextNode(`${rate}% · ${works}`));
+      row.appendChild(badge);
     }
     frag.appendChild(row);
   }
@@ -233,7 +236,7 @@ async function addCode() {
   const r = await send(payload);
   if (r?.ok) {
     msgEl.className = "add-msg ok";
-    msgEl.textContent = r.shared ? "Added & shared with the community 🎉" : "Added — it'll be tried first here.";
+    msgEl.textContent = r.shared ? "Added and shared with the community." : "Added — it'll be tried first here.";
     $("addCode").value = ""; $("addValue").value = "";
     loadMyCodes();
   } else {
