@@ -49,9 +49,11 @@ person can help everyone. It's anonymous and on your terms:
   adding a code. It sends `{ store domain, the code, optional discount }` — and
   nothing else.
 - **Crowd success rate** ("worked for 87% of people") is built from anonymous
-  "worked / didn't work" reports. This is **off by default**; it's only sent if
-  you enable "Share which codes worked" in Settings. The report is
-  `{ store domain, code, worked or failed }` — no identity attached.
+  "worked / didn't work" reports — `{ store domain, code, worked or failed }`,
+  no identity attached. This is **on by default** so the shared collection
+  actually works for everyone; a single toggle in Settings ("Share which codes
+  worked") turns it off, and it only does anything once the community backend is
+  deployed.
 - The API stores **no personal data** — only `(domain, code, discount, works,
   fails)`. The server code is open source under `worker/`.
 

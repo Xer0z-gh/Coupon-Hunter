@@ -255,7 +255,7 @@ async function loadSettings() {
   $("optAutoHunt").checked = o.optAutoHunt !== false;
   $("optAutoApply").checked = o.optAutoApply !== false;
   $("optFloatCard").checked = o.optFloatCard !== false;
-  $("optShareFeedback").checked = o.optShareFeedback === true;
+  $("optShareFeedback").checked = o.optShareFeedback !== false;
   $("optTtl").value = o.optTtl || 1;
 }
 function bindSettings() {

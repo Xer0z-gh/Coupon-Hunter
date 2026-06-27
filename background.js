@@ -23,20 +23,21 @@ function applyTtlHours(raw) {
   const h = parseFloat(raw);
   if (Number.isFinite(h) && h >= 1) cacheTtlMs = Math.min(h, 168) * 3600 * 1000;
 }
-// Opt-in: share anonymous "this code worked/failed" feedback with the community
-// to build crowd success rates. Default OFF — sharing is always the user's call.
-let shareFeedback = false;
+// Share anonymous "this code worked/failed" feedback with the community to build
+// crowd success rates — the data flywheel that makes shared codes great. ON by
+// default (anonymous, no PII); one toggle in Settings turns it off.
+let shareFeedback = true;
 chrome.storage.sync
   .get(["optTtl", "optShareFeedback"])
   .then((o) => {
     applyTtlHours(o.optTtl);
-    shareFeedback = o.optShareFeedback === true;
+    shareFeedback = o.optShareFeedback !== false;
   })
   .catch(() => {});
 chrome.storage.onChanged.addListener((ch, area) => {
   if (area !== "sync") return;
   if (ch.optTtl) applyTtlHours(ch.optTtl.newValue);
-  if (ch.optShareFeedback) shareFeedback = ch.optShareFeedback.newValue === true;
+  if (ch.optShareFeedback) shareFeedback = ch.optShareFeedback.newValue !== false;
 });
 
 // Codes the user added by hand for a store (Tab 3). Stored locally and merged
@@ -298,7 +299,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             });
             chrome.action.setBadgeBackgroundColor({
               tabId: sender.tab.id,
-              color: "#2383e2",
+              color: "#2563eb",
             });
           }
           sendResponse({ ok: true });
@@ -401,7 +402,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, change, tab) => {
       tabId,
       text: String(cached.codes.length),
     });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: "#2383e2" });
+    chrome.action.setBadgeBackgroundColor({ tabId, color: "#2563eb" });
   } else {
     // Pre-warm in background so popup is instant on first click.
     huntForDomain(domain).catch(() => {});
@@ -416,12 +417,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     "optAutoHunt",
     "optAutoApply",
     "optFloatCard",
+    "optShareFeedback",
   ]);
   const defaults = {};
   if (cur.optEnabled === undefined) defaults.optEnabled = true;
   if (cur.optAutoHunt === undefined) defaults.optAutoHunt = true;
   if (cur.optAutoApply === undefined) defaults.optAutoApply = true;
   if (cur.optFloatCard === undefined) defaults.optFloatCard = true;
+  if (cur.optShareFeedback === undefined) defaults.optShareFeedback = true;
   if (Object.keys(defaults).length) await chrome.storage.sync.set(defaults);
 
   // Friendly welcome on first install.

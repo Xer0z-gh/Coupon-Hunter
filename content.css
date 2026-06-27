@@ -69,7 +69,7 @@
 
 .cohunt-spark {
   font-size: 15px;
-  background: linear-gradient(135deg, #b14bf4 0%, #2383e2 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -118,7 +118,7 @@
   line-height: 1.1;
 }
 .cohunt-stat-value.cohunt-saved {
-  color: #19a463; /* friendly green for money saved */
+  color: #10b981; /* friendly green for money saved */
 }
 
 .cohunt-stat-label {
@@ -225,21 +225,21 @@
 }
 
 .cohunt-working .cohunt-state {
-  color: #19a463;
+  color: #10b981;
 }
 .cohunt-failed .cohunt-state {
   color: rgba(0, 0, 0, 0.45);
 }
 .cohunt-trying .cohunt-state {
-  color: #2383e2;
+  color: #2563eb;
 }
 .cohunt-failed .cohunt-code {
   opacity: 0.55;
   text-decoration: line-through;
 }
 .cohunt-working .cohunt-code {
-  background: rgba(25, 164, 99, 0.12);
-  color: #137c4b;
+  background: rgba(16, 185, 129, 0.12);
+  color: #0f7a52;
 }
 
 .cohunt-empty {
@@ -418,7 +418,7 @@
   height: 100%;
   width: 0%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #b14bf4 0%, #2383e2 100%);
+  background: linear-gradient(90deg, #2563eb 0%, #10b981 100%);
   transition: width 240ms ease;
 }
 
@@ -463,12 +463,12 @@
   animation: cohunt-glow 900ms ease;
 }
 @keyframes cohunt-glow {
-  0% { box-shadow: inset 0 0 0 2px rgba(25, 164, 99, 0); }
-  35% { box-shadow: inset 0 0 0 2px rgba(25, 164, 99, 0.55); }
-  100% { box-shadow: inset 0 0 0 2px rgba(25, 164, 99, 0); }
+  0% { box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0); }
+  35% { box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.55); }
+  100% { box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0); }
 }
 #cohunt-card.cohunt-success .cohunt-status {
-  color: #137c4b;
+  color: #0f7a52;
   font-weight: 600;
 }
 

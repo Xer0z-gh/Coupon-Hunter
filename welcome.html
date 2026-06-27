@@ -9,13 +9,13 @@
         --ink: #1c1c1e;
         --muted: rgba(0, 0, 0, 0.55);
         --line: rgba(0, 0, 0, 0.08);
-        --grad: linear-gradient(135deg, #b14bf4 0%, #2383e2 100%);
+        --grad: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
         min-height: 100vh;
-        background: radial-gradient(1200px 600px at 50% -10%, #f3f0ff 0%, #ffffff 55%);
+        background: radial-gradient(1200px 600px at 50% -10%, #eaf2ff 0%, #ffffff 55%);
         color: var(--ink);
         font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
           "Segoe UI", "Inter", system-ui, sans-serif;
@@ -37,8 +37,8 @@
       .lede { font-size: 18px; color: var(--muted); margin: 0 0 8px; line-height: 1.5; }
       .free {
         display: inline-block; margin-top: 14px; padding: 6px 14px; border-radius: 999px;
-        background: #eafaf1; color: #137c4b; font-weight: 700; font-size: 13px;
-        border: 1px solid rgba(25, 164, 99, 0.2);
+        background: #eafaf1; color: #0f7a52; font-weight: 700; font-size: 13px;
+        border: 1px solid rgba(16, 185, 129, 0.2);
       }
       .steps { margin: 36px 0; display: grid; gap: 14px; }
       .step {
@@ -61,7 +61,7 @@
       }
       .cta:hover { background: #000; }
       .foot { margin-top: 28px; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
-      .foot a { color: #2383e2; text-decoration: none; }
+      .foot a { color: #2563eb; text-decoration: none; }
       .priv {
         margin-top: 16px; padding: 16px 18px; border-radius: 16px;
         background: #f7f7f8; font-size: 13.5px; color: var(--muted); line-height: 1.55;
@@ -112,10 +112,10 @@
       <button class="cta" id="done"><span class="spark">✦</span> Start saving</button>
 
       <div class="priv">
-        <b>Your privacy:</b> Coupon Hunter runs entirely in your browser. It doesn't
-        have accounts, doesn't track you, and never sends your cart, payment details,
-        or browsing history anywhere. Coupon lookups fetch public coupon pages for the
-        store you're on — nothing more.
+        <b>Your privacy:</b> No accounts, no tracking, and your cart, payment details,
+        and browsing history never leave your browser. To make shared codes work for
+        everyone, anonymous "this code worked" feedback (just the store + code) is on
+        by default — you can switch it off anytime in Settings.
       </div>
 
       <div class="foot">
