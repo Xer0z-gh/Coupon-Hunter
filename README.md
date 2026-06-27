@@ -1,118 +1,109 @@
 # Coupon Hunter
 
-A Manifest V3 browser extension for Chrome, Edge, Brave, Arc, and Opera that finds working coupon codes for any store and auto-applies the best one at checkout. No accounts, no telemetry, no paywall. MIT licensed.
+![License](https://img.shields.io/badge/license-MIT-blue) ![Manifest](https://img.shields.io/badge/Manifest-V3-555)
 
-## Install
+Finds working coupon codes for whatever store you're checking out on and applies the best one automatically. Free, open source, no account, no ads.
 
-**Load unpacked (recommended for development)**
+It's a Manifest V3 extension, so it runs in Chrome, Edge, Brave, Arc, and Opera.
 
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (top-right toggle)
-3. Click **Load unpacked** and select this folder
-4. Pin the extension via the puzzle-piece menu
+> **Status:** feature-complete and used daily. Not on the Chrome Web Store yet, so for now you load it unpacked (takes about a minute, steps below).
 
-After any edit, click the **reload** icon on the extension card in `chrome://extensions`.
+## How it works
 
-**Chrome Web Store** — coming soon. Use the unpacked method in the meantime.
+A content script watches the page for a coupon field. The moment one appears, the service worker fans out to ~20 public coupon sites in parallel and also pulls any codes the store advertises on the page itself. It then types each candidate into the box, watches the order total react, and keeps whichever one drops it the most. You don't click anything.
 
-## What it does
+A few things it does that most coupon extensions don't:
 
-When a coupon/promo code input is detected at checkout, the extension:
+- **Actually picks the best code.** It tries every candidate instead of stopping at the first hit, and remembers the lowest total it reached. A provable early-exit stops the loop once nothing left could beat what's already banked, so it isn't slow about it.
+- **Survives hosted checkouts.** On Shop Pay, Stripe, PayPal, Klarna and the like, the page's domain is the *payment processor*, not the store. It works out the real merchant (from the referrer, or the most-linked domain on the page) and only applies that store's codes. If it genuinely can't tell, it applies nothing instead of guessing wrong.
+- **Will never submit your order.** The apply step refuses to click anything that reads like "Place order", "Pay", "Buy now", "Continue", etc. It only clicks real apply/redeem buttons, and that guard is unit-tested against a list of dangerous labels.
+- **Ranks by expected savings.** Codes proven to work (by you or the community) go first, then ones whose listing advertises a bigger discount, then everything else.
 
-1. Fans out in parallel to 20+ coupon databases (CouponFollow, RetailMeNot, Slickdeals, Wethrift, etc.) and also scans the page itself for codes the merchant advertises.
-2. Deduplicates results with cross-source consensus — codes corroborated by multiple independent sites are tried first.
-3. Applies each code in order of expected savings: proven past winners → advertised discount percentage → digit-in-code guess. Tries them all unless an early-exit condition is provably met (the banked saving beats the theoretical max any remaining code could yield).
-4. Keeps whichever code produces the lowest order total and re-applies it.
-5. Caches results per domain for 1 hour, revalidating in the background after 20 minutes.
+## Install (unpacked)
 
-**Third-party checkouts** (Shop Pay, Stripe, PayPal, Klarna, etc.): the extension resolves the real merchant from the referrer or the most-referenced domain in the page HTML, and only applies codes for that store. If attribution fails, nothing is applied.
+1. Download or clone this repo.
+2. Open `chrome://extensions`.
+3. Turn on **Developer mode** (top-right).
+4. Click **Load unpacked** and select the project folder.
 
-**Safety**: the apply loop refuses to click any button whose label looks like "Place Order", "Pay", "Buy Now", "Continue", or anything that could submit an order. Only explicit coupon-apply buttons ("Apply", "Redeem", "Use code") are clicked.
+After editing any file, click the reload icon on the extension's card.
 
-## File layout
+## The popup
 
-```
-coupon-hunter/
-├── manifest.json       MV3 manifest
-├── core.js             Shared pure logic — domain/POS resolution, code validation,
-│                       button and result classifiers, savings math. No DOM, no
-│                       Chrome APIs. Loaded as first content script and by tests.
-├── background.js       Service worker — hunt orchestration, cache, savings ledger,
-│                       settings, keyboard shortcut handler
-├── sources.js          Per-site coupon adapters (fan-out + extractors), consensus dedup
-├── content.js          In-page floating card, merchant resolution, auto-apply loop
-├── content.css         On-page card styles
-├── popup.html/css/js   Toolbar popup — 3 tabs (Apply / Scan / Add) + savings + settings
-├── welcome.html/js     First-run onboarding page
-├── worker/             Cloudflare Worker + D1 schema for the community collection
-├── tests/              Node unit tests (npm test)
-├── build.js            Cross-platform release packager (npm run build)
-├── icons/              PNG icons at 16/32/48/128px
-├── LICENSE             MIT
-└── PRIVACY.md          Privacy policy
-```
+Three tabs, with your lifetime savings pinned across the top:
 
-## Popup: three tabs
+- **Apply** — codes already found for the current store, and a button to apply the best one right now.
+- **Scan** — type any domain and see what coupons are live for it. Doubles as a quick "does this store even have codes?" checker.
+- **Add** — paste a code you know works so it gets tried first on that store, and optionally share it to the community collection.
 
-- **Apply** — the codes already found for the current store, with an "Apply best
-  code on this page" button. Shows the crowd success rate (`👍 87% · 124`) when
-  the community has data.
-- **Scan** — a public coupon checker for *any* store: type a domain, scan 20+
-  databases + the community, see what's live. Streams progress.
-- **Add** — contribute a code you know works so it's tried first on that store,
-  and optionally **share it with the community** (anonymous). Settings (master
-  on/off, per-site pause, auto toggles, cache, crowd-feedback opt-in) live behind
-  the gear, reachable from any tab. The lifetime-savings hero is always visible.
+The gear icon opens settings: pause on the current site, turn auto-hunt or auto-apply off, cache duration, and the community sharing toggle.
+
+## Privacy
+
+Everything the extension remembers (your savings, settings, and found codes) stays in your browser. No account, no analytics.
+
+Two things touch the network:
+
+1. **Coupon lookups** send the store's domain to public coupon sites. That's the same request you'd make by opening those sites yourself.
+2. **The community backend** (only if you deploy it, below). Codes you choose to share, plus anonymous "this code worked / didn't" feedback, get sent to it. The feedback is on by default and can be turned off in settings; it's only `{ domain, code, worked? }` with nothing tying it to you.
+
+Full write-up in [PRIVACY.md](PRIVACY.md).
 
 ## Community collection (optional)
 
-A Cloudflare Worker + D1 backend (in [`worker/`](worker/)) lets codes that work
-for one person help everyone, with a crowd success rate per code. It's **off
-until you deploy it**: `cd worker && wrangler deploy`, then set `API_BASE` in
-`sources.js` to the printed URL. Anonymous, no accounts, no PII — see
-[`worker/README.md`](worker/README.md) and the privacy policy. Sharing is always
-opt-in (a per-code checkbox; crowd feedback is a Settings toggle, default off).
+There's a small Cloudflare Worker + D1 backend in [`worker/`](worker/) that turns shared codes into a crowd-rated collection ("worked for 87% of people"). It stays dormant until you stand it up:
+
+```bash
+cd worker
+wrangler deploy
+```
+
+Then put the URL it prints into `API_BASE` at the top of `sources.js` and reload. The API and schema are documented in [worker/README.md](worker/README.md). Until `API_BASE` is set, the community source is simply skipped and nothing else changes.
+
+## Project layout
+
+```
+manifest.json      MV3 manifest
+core.js            Pure logic: merchant/POS resolution, code + button + result
+                   classifiers, money parsing, ranking math. No DOM, no chrome
+                   APIs, so it's unit-tested directly and shared by the content script.
+background.js      Service worker: hunt orchestration, per-domain cache,
+                   savings ledger, settings, keyboard shortcut, community feedback.
+sources.js         The ~20 coupon-site adapters, the community client, and the
+                   cross-source consensus merge.
+content.js         The on-page card, merchant resolution, and the apply loop.
+content.css        Card styles (light + dark).
+popup.html/css/js  Toolbar popup: the three tabs, savings, settings.
+welcome.html/js    First-run page.
+worker/            Cloudflare Worker + D1 schema for the optional community API.
+tests/             Node test suite.
+build.js           Zips the runtime files for the Web Store.
+icons/             16 / 32 / 48 / 128 px.
+```
 
 ## Development
 
-No build step for day-to-day work — it's plain JS/CSS/HTML. Load unpacked, edit, reload.
+Plain JS, CSS, and HTML. No bundler, no install step for day-to-day work.
 
+```bash
+npm test       # unit tests (node --test)
+npm run check  # syntax-check every script
+npm run build  # zip the runtime files into dist/ for the Web Store
 ```
-npm test          # run unit tests with node --test
-npm run check     # syntax-check all scripts with node --check
-npm run build     # package dist/coupon-hunter-v<version>.zip for the store
-```
 
-`build.js` uses `zip` on macOS/Linux and falls back to PowerShell's `Compress-Archive` on Windows — no extra tools needed on any platform.
+`core.js` holds the bug-prone, safety-relevant code on purpose: the never-click-Pay button classifier, the apply-result classifier, the currency parser, and the ranking/early-exit math. It runs in both a content script and Node (it assigns `globalThis.CHCore`), which is what lets the tests import it without a browser. If you change any of that logic, add a case to `tests/`.
 
-## Architecture notes
+## Limitations
 
-- `core.js` is the only file unit-tested in isolation. All bug-prone or safety-critical logic belongs there: `classifyButtonLabel` (the "never click Pay" guard), `classifyResultText`, `parseMoney`, `buildApplyQueue`, `suffixCeilings`.
-- The service worker (`background.js`) owns the single shared cache and savings ledger. Content scripts and the popup communicate with it via `chrome.runtime.sendMessage`.
-- `sources.js` uses ES module exports (`export function …`) and is imported by the service worker. `core.js` uses an IIFE that sets `globalThis.CHCore` so it works both as a content script and in Node (tests).
-
-## Known limitations
-
-- Coupon sites change markup constantly. Structural extraction runs first; a regex fallback over raw HTML catches changes. Worst case: fewer hits from one source.
-- Sites behind Cloudflare bot protection return zero results silently. The other sources still run.
-- The apply loop depends on the merchant's coupon input and apply button following common patterns (Shopify, WooCommerce, BigCommerce, Magento, and most custom checkouts). Unusual implementations may require manual copy-paste from the card.
-- No cashback or price-drop tracking — those require monetizing purchase data. The optional community collection is the only network feature beyond coupon lookups, it's opt-in, anonymous, and stores no personal data.
-
-## How it compares to Honey
-
-| | Coupon Hunter | Typical coupon extension |
-|---|---|---|
-| Price | Free, MIT | Free, closed source |
-| Business model | None | Affiliate commissions / selling data |
-| Your data | Never leaves your browser | Tracks purchases and browsing |
-| Best code selection | Tries all, keeps the biggest, with early-exit proof | Stops at first working code |
-| Hosted checkouts | Resolves the real merchant | Often applies wrong store's codes |
-| Safety | Hard guard — never clicks Pay/Place Order | — |
+- Coupon sites rewrite their markup constantly. Extraction is structural first with a regex fallback, so when a source breaks you just get fewer hits from it, not a crash.
+- A few sources sit behind bot protection and quietly return nothing. The rest still run.
+- Auto-apply needs the checkout to use a recognizable coupon field and apply button. The big platforms (Shopify, WooCommerce, BigCommerce, Magento, and most custom carts) work; an unusual one may need a manual paste from the card.
+- It doesn't do cashback or price tracking. Those need to monetize your purchase history, which is the thing this is trying not to do.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Most impactful: new coupon sources in `sources.js` and checkout selector fixes in `content.js`.
+PRs welcome. The two most useful contributions are adding a coupon source in `sources.js` and fixing checkout selectors in `content.js` for a store that gets missed. Details in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — do what you want with it.

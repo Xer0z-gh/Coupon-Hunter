@@ -96,40 +96,44 @@ async function loadSavings() {
 // ---------------------------------------------------------------------------
 // Shared code-row rendering
 // ---------------------------------------------------------------------------
-function communityBadge(c) {
-  const works = c.works || 0, fails = c.fails || 0;
-  if (works + fails < 1) return "";
-  const rate = Math.round((works / (works + fails)) * 100);
-  return `<span class="row-badge">👍 ${rate}% · ${works}</span>`;
-}
 function sourceLabel(c) {
   const extra = c.sourceCount > 1 ? ` +${c.sourceCount - 1}` : "";
   return (c.source || "") + extra;
 }
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+// Row layout: clickable code · source/consensus · crowd badge (if any).
 function renderCodeList(container, codes, emptyMsg) {
   container.innerHTML = "";
   if (!codes || !codes.length) {
-    if (emptyMsg) container.innerHTML = `<div class="hint">${emptyMsg}</div>`;
+    if (emptyMsg) container.appendChild(el("div", "hint", emptyMsg));
     return;
   }
+  const frag = document.createDocumentFragment();
   for (const c of codes.slice(0, 60)) {
-    const badge = communityBadge(c);
-    const row = document.createElement("div");
-    row.className = "row-item";
-    row.innerHTML = `
-      <code class="row-code"></code>
-      ${badge || `<span class="row-meta"></span>`}
-      <span class="row-meta-2"></span>`;
-    row.querySelector(".row-code").textContent = c.code;
-    if (!badge) row.querySelector(".row-meta").textContent = sourceLabel(c);
-    const m2 = row.querySelector(".row-meta-2");
-    if (m2) { m2.className = "row-meta"; m2.textContent = badge ? sourceLabel(c) : ""; }
-    row.querySelector(".row-code").addEventListener("click", () => {
+    const row = el("div", "row-item");
+    const code = el("code", "row-code", c.code);
+    code.title = "Click to copy";
+    code.addEventListener("click", () => {
       navigator.clipboard?.writeText(c.code);
       setMeta(`Copied ${c.code}`);
     });
-    container.appendChild(row);
+    row.append(code, el("span", "row-meta", sourceLabel(c)));
+    const works = c.works || 0;
+    const fails = c.fails || 0;
+    if (works + fails > 0) {
+      row.appendChild(
+        el("span", "row-badge", `👍 ${Math.round((works / (works + fails)) * 100)}% · ${works}`)
+      );
+    }
+    frag.appendChild(row);
   }
+  container.appendChild(frag);
 }
 
 // ---------------------------------------------------------------------------

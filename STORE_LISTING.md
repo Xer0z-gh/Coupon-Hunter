@@ -64,11 +64,10 @@ Coupon Hunter has one purpose: to find working coupon codes for the store a user
 ## Permission justifications (required for review)
 
 - **storage** — Save the user's settings and their local lifetime-savings total.
-- **activeTab** + **scripting** — Detect the coupon field on the checkout page the user is viewing and type/apply codes into it.
-- **tabs** — Read the current tab's domain to look up coupons relevant to that store.
+- **scripting** — Apply the chosen coupon on the checkout page the user is viewing (the popup's "Apply" button runs the apply routine in the active tab).
+- **tabs** — Read the current tab's domain to look up coupons relevant to that store, and stream hunt progress back to the on-page card.
 - **host access (`<all_urls>`)** — Coupon fields can appear on any online store, so the extension must be able to run on any checkout. It only takes action when a coupon field is actually present, and the user can pause it per-site.
 - **notifications** — Let the user know when a coupon saved them money.
-- **alarms** — Maintain the short-lived local cache of fetched coupon codes.
 
 ## Data use disclosures (privacy tab)
 

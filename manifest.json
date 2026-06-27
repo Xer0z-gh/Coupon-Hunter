@@ -7,10 +7,8 @@
   "homepage_url": "https://github.com/Xer0z-gh/coupon-hunter",
   "permissions": [
     "storage",
-    "activeTab",
     "scripting",
     "tabs",
-    "alarms",
     "notifications"
   ],
   "host_permissions": [
@@ -52,12 +50,6 @@
       "css": ["content.css"],
       "run_at": "document_idle",
       "all_frames": false
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["popup.html", "icons/*"],
-      "matches": ["<all_urls>"]
     }
   ]
 }
