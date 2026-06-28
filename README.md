@@ -18,6 +18,7 @@ A few things it does that most coupon extensions don't:
 - **Survives hosted checkouts.** On Shop Pay, Stripe, PayPal, Klarna and the like, the page's domain is the *payment processor*, not the store. It works out the real merchant (from the referrer, or the most-linked domain on the page) and only applies that store's codes. If it genuinely can't tell, it applies nothing instead of guessing wrong.
 - **Will never submit your order.** The apply step refuses to click anything that reads like "Place order", "Pay", "Buy now", "Continue", etc. It only clicks real apply/redeem buttons, and that guard is unit-tested against a list of dangerous labels.
 - **Ranks by expected savings.** Codes proven to work (by you or the community) go first, then ones whose listing advertises a bigger discount, then everything else.
+- **Stops re-testing dead codes.** A code that failed here gets remembered and skipped for a month (in case it comes back), and once the community has tried a code enough times to know it's dead, nobody wastes time on it. Codes the store is advertising right now are always tried regardless.
 
 ## Install (unpacked)
 

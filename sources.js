@@ -417,6 +417,10 @@ export function dedupeWithConsensus(flat) {
       if (rec.obj.pct == null && c.pct != null) rec.obj.pct = c.pct;
       if (rec.obj.amount == null && c.amount != null) rec.obj.amount = c.amount;
       if (!rec.obj.freeShip && c.freeShip) rec.obj.freeShip = true;
+      // Carry the crowd works/fails counts (only the community source has them)
+      // so the dead-code gate can see them even on a DB-listed code.
+      if (rec.obj.works == null && c.works != null) rec.obj.works = c.works;
+      if (rec.obj.fails == null && c.fails != null) rec.obj.fails = c.fails;
     }
     if (c.source && !c.generated) rec.sources.add(c.source);
   }

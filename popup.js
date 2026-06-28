@@ -100,6 +100,28 @@ function sourceLabel(c) {
   const extra = c.sourceCount > 1 ? ` +${c.sourceCount - 1}` : "";
   return (c.source || "") + extra;
 }
+
+// Hide crowd-confirmed-dead codes and float the best to the top so the user
+// sees the deal most likely to work first. (The on-page apply loop does its own
+// stricter ranking; this is just for what's shown in the popup.)
+function bestFirst(codes) {
+  const crowd = (c) => {
+    const t = (c.works || 0) + (c.fails || 0);
+    if (t < 3) return 0; // not enough reports to judge
+    const r = (c.works || 0) / t;
+    return r >= 0.5 ? 2 : r < 0.08 ? -2 : 0;
+  };
+  const disc = (c) => (c.pct ? c.pct : c.amount ? Math.min(95, c.amount) : 0);
+  return (codes || [])
+    .filter((c) => crowd(c) !== -2) // drop the dead
+    .slice()
+    .sort(
+      (a, b) =>
+        crowd(b) - crowd(a) ||
+        disc(b) - disc(a) ||
+        (b.sourceCount || 0) - (a.sourceCount || 0)
+    );
+}
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -149,7 +171,7 @@ async function loadAppliedCodes() {
     return;
   }
   const r = await send({ type: "get-cached", domain: state.domain });
-  const codes = (r && r.codes) || [];
+  const codes = bestFirst((r && r.codes) || []);
   renderCodeList($("applyList"), codes, "");
   $("applyHint").hidden = codes.length > 0;
   $("applyHint").textContent = codes.length
@@ -188,7 +210,7 @@ function startScan() {
     $("scanBtn").disabled = false;
     $("scanBar").hidden = true;
     if (!r?.ok) { $("scanStatus").textContent = "Scan failed — try again."; return; }
-    const codes = r.codes || [];
+    const codes = bestFirst(r.codes || []);
     $("scanStatus").textContent = codes.length
       ? `Found ${codes.length} code${codes.length > 1 ? "s" : ""} for ${domain}.`
       : `No codes found for ${domain} yet.`;

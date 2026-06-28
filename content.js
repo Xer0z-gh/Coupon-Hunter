@@ -778,8 +778,9 @@
       expandCard();
       const baseline = readOrderTotal();
       // Order by expected savings (proven > advertised discount > guess), using
-      // the live cart total to turn "20% off" into real dollars.
-      const queue = buildApplyQueue(currentCodes, logRes?.log || {}, baseline);
+      // the live cart total to turn "20% off" into real dollars. Known-dead
+      // codes (failed here recently, or crowd-confirmed dead) are dropped.
+      const queue = buildApplyQueue(currentCodes, logRes?.log || {}, baseline, Date.now());
       const suffixCeil = suffixCeilings(queue, baseline);
 
       // Track the lowest total any code produced — that's the absolute best.

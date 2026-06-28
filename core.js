@@ -99,6 +99,8 @@
             amount: prev.amount != null ? prev.amount : c.amount,
             freeShip: prev.freeShip || c.freeShip || false,
             sourceCount: Math.max(prev.sourceCount || 0, c.sourceCount || 0),
+            works: prev.works != null ? prev.works : c.works,
+            fails: prev.fails != null ? prev.fails : c.fails,
           });
         }
       }
@@ -227,19 +229,49 @@
     return potentialFromCode(c.code);
   }
 
-  // Build the try-order for the apply loop: dedupe + drop junk, then sort by
+  // Has this code earned a "don't bother" verdict? This is how we stop wasting
+  // time re-testing dead codes — locally (you tried it, it failed) and globally
+  // (the crowd's tried it enough to know it's dead). A code that's proven to
+  // work, or that the store is advertising on the page right now, is never
+  // skipped. Failed codes are re-tested after FAIL_SKIP_MS in case they come
+  // back (seasonal sales, etc.).
+  const FAIL_SKIP_MS = 30 * 24 * 3600 * 1000; // 30 days
+  const CROWD_MIN_SAMPLES = 5; // need this many crowd reports to trust a verdict
+  const CROWD_DEAD_RATE = 0.08; // <8% success across enough tries = dead
+  function isDeadCode(c, resultsLog, now) {
+    const log = resultsLog || {};
+    const t = typeof now === "number" ? now : Date.now();
+    const r = log[c.code];
+    if (r && r.status === "working") return false; // proven good — always keep
+    if (c.onPage) return false; // the store is advertising it right now
+    if (r && r.status === "failed" && r.ts && t - r.ts < FAIL_SKIP_MS) return true;
+    const total = (c.works || 0) + (c.fails || 0);
+    if (total >= CROWD_MIN_SAMPLES && (c.works || 0) / total < CROWD_DEAD_RATE) {
+      return true;
+    }
+    return false;
+  }
+
+  // Build the try-order for the apply loop. First DROP known-dead codes (junk,
+  // recently-failed here, crowd-confirmed dead), then dedupe, then sort by
   //   1. expected savings, biggest first (proven history > advertised discount
   //      > digit guess) — so the likely jackpot is tried first,
   //   2. trust on ties: on-page > listed DB > generated guess,
-  //   3. cross-source consensus: more sites listing it = try it sooner.
-  // Every code stays in the queue — ordering only decides who goes first.
-  function buildApplyQueue(codes, resultsLog, baseline) {
+  //   3. crowd net votes, then cross-source consensus.
+  function buildApplyQueue(codes, resultsLog, baseline, now) {
     const log = resultsLog || {};
     const trust = (c) => (c.onPage ? 0 : c.generated ? 2 : 1);
     const netVotes = (c) => (c.works || 0) - (c.fails || 0); // crowd success
     const seen = new Set();
     return (codes || [])
-      .filter((c) => c && isGoodCode(c.code) && !seen.has(c.code) && seen.add(c.code))
+      .filter(
+        (c) =>
+          c &&
+          isGoodCode(c.code) &&
+          !isDeadCode(c, log, now) &&
+          !seen.has(c.code) &&
+          seen.add(c.code)
+      )
       .map((c) => ({ c, exp: expectedSavings(c, baseline, log) }))
       .sort(
         (a, b) =>
@@ -288,6 +320,7 @@
     potentialFromCode,
     ceilSavings,
     expectedSavings,
+    isDeadCode,
     buildApplyQueue,
     suffixCeilings,
   };

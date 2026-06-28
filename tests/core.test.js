@@ -218,3 +218,44 @@ test("ceilSavings widens the bound with an advertised discount", () => {
   // String form still works unchanged.
   assert.equal(C.ceilSavings("SAVE50", 200), 100);
 });
+
+test("isDeadCode: skips recently-failed and crowd-dead, keeps proven/on-page", () => {
+  const now = 1_700_000_000_000;
+  const day = 86400000;
+  const log = {
+    GOOD: { status: "working", savings: 5, ts: now - 100 * day },
+    FAILEDNEW: { status: "failed", ts: now - 2 * day },
+    FAILEDOLD: { status: "failed", ts: now - 40 * day },
+  };
+  assert.equal(C.isDeadCode({ code: "GOOD" }, log, now), false, "proven working");
+  assert.equal(C.isDeadCode({ code: "FAILEDNEW" }, log, now), true, "failed recently");
+  assert.equal(C.isDeadCode({ code: "FAILEDOLD" }, log, now), false, "failed long ago is re-testable");
+  assert.equal(C.isDeadCode({ code: "X", works: 0, fails: 20 }, {}, now), true, "crowd dead");
+  assert.equal(C.isDeadCode({ code: "Y", works: 1, fails: 30 }, {}, now), true, "crowd ~3% dead");
+  assert.equal(C.isDeadCode({ code: "Z", works: 0, fails: 3 }, {}, now), false, "thin crowd data");
+  assert.equal(C.isDeadCode({ code: "W", works: 8, fails: 1 }, {}, now), false, "crowd good");
+  assert.equal(C.isDeadCode({ code: "ON", works: 0, fails: 50, onPage: true }, {}, now), false, "on-page overrides");
+  assert.equal(C.isDeadCode({ code: "FRESH" }, {}, now), false, "untried");
+});
+
+test("buildApplyQueue drops dead codes from the try-order", () => {
+  const now = 1_700_000_000_000;
+  const day = 86400000;
+  const log = {
+    OLDFAIL: { status: "failed", ts: now - 2 * day },
+    PROVEN: { status: "working", savings: 9 },
+  };
+  const codes = [
+    { code: "OLDFAIL" },
+    { code: "CROWDDEAD", works: 0, fails: 25 },
+    { code: "PROVEN" },
+    { code: "SAVE30" },
+    { code: "ADVERTISED", onPage: true, works: 0, fails: 25 },
+  ];
+  const q = C.buildApplyQueue(codes, log, 100, now).map((c) => c.code);
+  assert.ok(!q.includes("OLDFAIL"), "recently-failed dropped");
+  assert.ok(!q.includes("CROWDDEAD"), "crowd-dead dropped");
+  assert.equal(q[0], "PROVEN", "proven winner leads");
+  assert.ok(q.includes("SAVE30"), "fresh code kept");
+  assert.ok(q.includes("ADVERTISED"), "on-page kept despite crowd-dead");
+});
