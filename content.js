@@ -464,7 +464,7 @@
     const res = await safeSend({ type: "hunt", domain, force: true });
     btn.disabled = false;
     $("[data-scan-progress]").hidden = true;
-    const codes = (res && res.codes) || [];
+    const codes = scanVisible((res && res.codes) || []);
     $("[data-scan-status]").textContent = codes.length
       ? `Found ${codes.length} code${codes.length > 1 ? "s" : ""} for ${domain}.`
       : `No codes found for ${domain} yet.`;
@@ -613,15 +613,60 @@
 
   let currentCodes = [];
   let attempted = new Map(); // code -> "working"|"failed"|"trying"
+  let provenGood = new Set(); // codes proven to work here in earlier sessions
+
+  // Best-first display order: crowd-proven, then advertised discount, then
+  // cross-source consensus.
+  function cardBestFirst(codes) {
+    const crowd = (c) => {
+      const t = (c.works || 0) + (c.fails || 0);
+      if (t < 3) return 0;
+      const r = (c.works || 0) / t;
+      return r >= 0.5 ? 2 : r < 0.08 ? -2 : 0;
+    };
+    const disc = (c) => (c.pct ? c.pct : c.amount ? Math.min(95, c.amount) : 0);
+    return [...codes].sort(
+      (a, b) =>
+        crowd(b) - crowd(a) ||
+        disc(b) - disc(a) ||
+        (b.sourceCount || 0) - (a.sourceCount || 0)
+    );
+  }
+
+  // Scan tab = discovery: everything found for the store, minus crowd-dead noise.
+  function scanVisible(codes) {
+    const dead = (c) => {
+      const t = (c.works || 0) + (c.fails || 0);
+      return t >= 5 && (c.works || 0) / t < 0.08;
+    };
+    return cardBestFirst(codes.filter((c) => !dead(c)));
+  }
+
+  // Apply tab = only the GOOD codes: working this session, proven to work here
+  // before, or crowd-trusted. Invalid/failed and dead codes never appear here.
+  function isGoodForApply(c) {
+    const st = attempted.get(c.code);
+    if (st === "failed") return false;
+    if (st === "working" || st === "trying") return true;
+    if (provenGood.has(c.code)) return true;
+    const t = (c.works || 0) + (c.fails || 0);
+    return t >= 3 && (c.works || 0) / t >= 0.5;
+  }
 
   function renderList() {
     const list = $("[data-cohunt-list]");
     list.innerHTML = "";
-    if (!currentCodes.length) {
-      list.innerHTML = `<li class="cohunt-empty">No codes yet. We'll keep searching.</li>`;
+    const good = cardBestFirst(currentCodes.filter(isGoodForApply));
+    if (!good.length) {
+      const msg = applyInFlight
+        ? "Testing codes — the ones that work land here."
+        : currentCodes.length
+        ? "Found codes — hit Auto-apply, or open Scan to see them all."
+        : "Use the Scan tab to find codes for this store.";
+      list.innerHTML = `<li class="cohunt-empty">${msg}</li>`;
       return;
     }
-    for (const c of currentCodes.slice(0, 12)) {
+    for (const c of good.slice(0, 12)) {
       const state = attempted.get(c.code) || "idle";
       const li = document.createElement("li");
       li.className = `cohunt-item cohunt-${state}`;
@@ -629,18 +674,10 @@
         <code class="cohunt-code"></code>
         <span class="cohunt-source"></span>
         <span class="cohunt-state">${
-          state === "working"
-            ? "Saved"
-            : state === "failed"
-            ? "Invalid"
-            : state === "trying"
-            ? "Trying…"
-            : ""
+          state === "working" ? "Saved" : state === "trying" ? "Trying…" : ""
         }</span>
       `;
       li.querySelector(".cohunt-code").textContent = c.code;
-      // Show cross-source consensus ("CouponFollow +3") — corroborated codes
-      // are far likelier to work.
       const extra = c.sourceCount > 1 ? ` +${c.sourceCount - 1}` : "";
       li.querySelector(".cohunt-source").textContent = (c.source || "") + extra;
       li.querySelector(".cohunt-code").addEventListener("click", () => {
@@ -649,6 +686,22 @@
       });
       list.appendChild(li);
     }
+  }
+
+  // Push the just-found codes into the Scan tab so "find codes at checkout"
+  // works without re-typing the store.
+  function renderFoundIntoScan() {
+    const inp = $("[data-scan-input]");
+    if (inp && !inp.value) inp.value = huntDomain || "";
+    const status = $("[data-scan-status]");
+    if (status) {
+      status.textContent = currentCodes.length
+        ? `Found ${currentCodes.length} code${
+            currentCodes.length > 1 ? "s" : ""
+          } for ${huntDomain}.`
+        : "";
+    }
+    renderSimpleList($("[data-scan-list]"), scanVisible(currentCodes));
   }
 
   // -- Hunt orchestration ------------------------------------------------------
@@ -693,7 +746,9 @@
   // for huntDomain. Generated/common guesses are filtered out in mergeCodes,
   // so we only ever try real coupons found for the site you're on.
   function onCodesResolved() {
+    loadProvenGood(); // re-renders Apply once we know which codes are proven
     renderList();
+    renderFoundIntoScan();
     if (currentCodes.length) {
       retryAttempts = 0;
       retryPending = false;
@@ -707,6 +762,18 @@
     } else {
       scheduleRetryHunt();
     }
+  }
+
+  // Which of this store's codes are proven to work (from past sessions), so the
+  // Apply tab can show them as good before we even start applying.
+  function loadProvenGood() {
+    safeSend({ type: "get-results-log", domain: huntDomain }).then((r) => {
+      const log = (r && r.log) || {};
+      provenGood = new Set(
+        Object.keys(log).filter((k) => log[k] && log[k].status === "working")
+      );
+      renderList();
+    });
   }
 
   // Keep searching until real codes turn up for this specific store (handles
