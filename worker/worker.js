@@ -102,6 +102,49 @@ export default {
         return json({ ok: true });
       }
 
+      if (request.method === "POST" && url.pathname === "/v1/coupons/bulk") {
+        const body = await request.json().catch(() => ({}));
+        const domain = cleanDomain(body.domain);
+        if (!domain || !Array.isArray(body.codes))
+          return json({ ok: false, error: "invalid" }, 400);
+        let room =
+          MAX_CODES_PER_DOMAIN -
+          (await env.DB.prepare(`SELECT COUNT(*) AS n FROM coupons WHERE domain = ?`)
+            .bind(domain)
+            .first("n"));
+        const now = Date.now();
+        const stmts = [];
+        const seen = new Set();
+        for (const raw of body.codes.slice(0, 100)) {
+          if (room <= 0) break;
+          const code = cleanCode(raw && raw.code);
+          if (!code || seen.has(code)) continue;
+          seen.add(code);
+          stmts.push(
+            env.DB.prepare(
+              `INSERT INTO coupons (domain, code, pct, amount, freeship, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(domain, code) DO UPDATE SET
+                 pct = COALESCE(excluded.pct, coupons.pct),
+                 amount = COALESCE(excluded.amount, coupons.amount),
+                 freeship = MAX(coupons.freeship, excluded.freeship),
+                 updated_at = excluded.updated_at`
+            ).bind(
+              domain,
+              code,
+              intOrNull(raw.pct, 1, 95),
+              intOrNull(raw.amount, 1, 2000),
+              raw.freeShip ? 1 : 0,
+              now,
+              now
+            )
+          );
+          room--;
+        }
+        if (stmts.length) await env.DB.batch(stmts);
+        return json({ ok: true, added: stmts.length });
+      }
+
       if (request.method === "POST" && url.pathname === "/v1/feedback") {
         const body = await request.json().catch(() => ({}));
         const domain = cleanDomain(body.domain);

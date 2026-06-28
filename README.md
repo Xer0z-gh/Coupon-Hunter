@@ -50,9 +50,16 @@ Two things touch the network:
 
 Full write-up in [PRIVACY.md](PRIVACY.md).
 
-## Community collection (optional)
+## The coupon network (optional backend)
 
-There's a small Cloudflare Worker + D1 backend in [`worker/`](worker/) that turns shared codes into a crowd-rated collection ("worked for 87% of people"). It stays dormant until you stand it up:
+With the backend deployed, Coupon Hunter becomes a shared network instead of a private cache, and the three tabs map onto it:
+
+- **Scan** — when anyone scans a store, the codes they find are contributed to that store's shared pool (deduped and capped server-side). The pool grows from everyone's scans.
+- **Add** — codes people add by hand go into the same pool.
+- Every apply attempt reports an anonymous worked/failed result, which builds a crowd success rate per code.
+- **Apply** — only the **crowd-validated** codes (the ones that actually work) surface here; codes the network has confirmed dead are dropped so nobody keeps re-testing them.
+
+The backend is a small Cloudflare Worker + D1 database in [`worker/`](worker/). It stays dormant until you stand it up — until then everything runs locally and works exactly the same, just without the shared pool:
 
 ```bash
 cd worker

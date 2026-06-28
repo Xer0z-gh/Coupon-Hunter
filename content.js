@@ -378,7 +378,7 @@
       </div>
 
       <div class="cohunt-panel" data-panel="scan" hidden>
-        <div class="cohunt-blurb">Check any store for live coupons.</div>
+        <div class="cohunt-blurb">Find codes for this store — your scans join the shared pool, and the ones that work rise to Apply.</div>
         <div class="cohunt-field-row">
           <input class="cohunt-input" data-scan-input placeholder="store.com" autocomplete="off" />
           <button class="cohunt-btn" data-scan-btn>Scan</button>

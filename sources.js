@@ -66,6 +66,19 @@ export async function submitCommunityCode(domain, code, meta = {}) {
   return !!(r && r.ok);
 }
 
+// Contribute everything a scan turned up, so the shared pool grows from every
+// user's scans. The server dedupes and caps per domain. This is what makes it a
+// network rather than a private cache.
+export async function submitCommunityCodes(domain, codes) {
+  if (!API_BASE || !Array.isArray(codes) || !codes.length) return false;
+  const r = await fetchJson(`${API_BASE}/v1/coupons/bulk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ domain, codes: codes.slice(0, 80) }),
+  });
+  return !!(r && r.ok);
+}
+
 // Report whether a code worked, to build the crowd success rate (opt-in).
 export async function submitCommunityFeedback(domain, code, status) {
   if (!API_BASE) return false;

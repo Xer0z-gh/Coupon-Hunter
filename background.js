@@ -9,6 +9,7 @@ import {
   gatherCoupons,
   SOURCE_NAMES,
   submitCommunityCode,
+  submitCommunityCodes,
   submitCommunityFeedback,
 } from "./sources.js";
 
@@ -119,6 +120,17 @@ function rootDomain(host) {
   return h;
 }
 
+// Seed the shared pool with the real codes a scan discovered (not generated
+// guesses, not codes that came back from the pool itself). Opt-out via the same
+// "share with the community" toggle.
+function contributeScan(domain, codes) {
+  if (!shareFeedback) return;
+  const fresh = (codes || [])
+    .filter((c) => c && !c.generated && c.source !== "Community")
+    .map((c) => ({ code: c.code, pct: c.pct, amount: c.amount, freeShip: c.freeShip }));
+  if (fresh.length) submitCommunityCodes(domain, fresh).catch(() => {});
+}
+
 const liveHunts = new Map(); // domain -> Promise
 
 async function huntForDomain(domain, { force = false } = {}) {
@@ -153,6 +165,9 @@ function runHunt(domain) {
     });
     await writeCache(domain, { codes });
     broadcastProgress(domain, { phase: "complete", codes });
+    // Network effect: feed everything this scan found back into the shared pool
+    // so it grows from every user's scans. Deduped + capped server-side.
+    contributeScan(domain, codes);
     return codes;
   })().finally(() => {
     liveHunts.delete(domain);

@@ -1,8 +1,10 @@
 # Coupon Hunter — community API (Cloudflare Worker + D1)
 
-An anonymous, no-account, no-PII backend for the shared coupon collection.
-Codes users choose to share land here; everyone's extension can pull them and
-report whether they worked, building a crowd success rate per code.
+An anonymous, no-account, no-PII backend that turns the extension into a coupon
+network. Every scan contributes the codes it finds to a per-store shared pool;
+everyone's extension pulls that pool and reports whether each code worked,
+building a crowd success rate. The validated codes surface in the Apply tab; the
+ones the crowd confirms dead get dropped.
 
 ## What's already done
 
@@ -38,8 +40,9 @@ skipped — everything else works unchanged.
 
 | Method | Path | Body / Query | Purpose |
 |---|---|---|---|
-| `GET` | `/v1/coupons?domain=store.com` | — | Codes others shared, crowd-ranked |
-| `POST` | `/v1/coupons` | `{domain, code, pct?, amount?, freeShip?}` | Contribute a code |
+| `GET` | `/v1/coupons?domain=store.com` | — | Codes in the pool, crowd-ranked |
+| `POST` | `/v1/coupons` | `{domain, code, pct?, amount?, freeShip?}` | Contribute one code |
+| `POST` | `/v1/coupons/bulk` | `{domain, codes:[{code, pct?, amount?, freeShip?}]}` | Contribute a whole scan |
 | `POST` | `/v1/feedback` | `{domain, code, status:"working"\|"failed"}` | Crowd success rate |
 
 All input is validated (code `^[A-Z0-9]{4,20}$`, domain a hostname, pct 1–95,
