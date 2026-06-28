@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "test": "node --test",
-    "check": "node --check background.js && node --check sources.js && node --check content.js && node --check core.js && node --check popup.js && node --check welcome.js && node --check worker/worker.js",
+    "check": "node --check background.js && node --check sources.js && node --check content.js && node --check core.js && node --check popup.js && node --check welcome.js && node --check worker/worker.js && node --check build.js",
     "build": "node build.js"
   },
   "license": "MIT",
