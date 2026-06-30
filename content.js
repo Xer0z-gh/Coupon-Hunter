@@ -378,7 +378,7 @@
       </div>
 
       <div class="cohunt-panel" data-panel="scan" hidden>
-        <div class="cohunt-blurb">Find codes for this store — your scans join the shared pool, and the ones that work rise to Apply.</div>
+        <div class="cohunt-blurb">Scan to find more codes for this store. They're tested right here, and the ones that work move to the Apply tab.</div>
         <div class="cohunt-field-row">
           <input class="cohunt-input" data-scan-input placeholder="store.com" autocomplete="off" />
           <button class="cohunt-btn" data-scan-btn>Scan</button>
@@ -464,11 +464,33 @@
     const res = await safeSend({ type: "hunt", domain, force: true });
     btn.disabled = false;
     $("[data-scan-progress]").hidden = true;
-    const codes = scanVisible((res && res.codes) || []);
-    $("[data-scan-status]").textContent = codes.length
-      ? `Found ${codes.length} code${codes.length > 1 ? "s" : ""} for ${domain}.`
-      : `No codes found for ${domain} yet.`;
+    const found = (res && res.codes) || [];
+    const codes = scanVisible(found);
     renderSimpleList($("[data-scan-list]"), codes);
+
+    // If this is the store you're checking out on, test every code right now and
+    // let the winners flow into the Apply tab (best deals first).
+    const here = resolveMerchant();
+    if (found.length && domain === here && findCouponInput()) {
+      huntDomain = domain;
+      lastPageCodes = scanPageForCodes();
+      currentCodes = mergeCodes(lastPageCodes, found);
+      if (applyInFlight) {
+        $("[data-scan-status]").textContent = `Already checking codes for ${domain}…`;
+      } else {
+        attempted = new Map();
+        autoApplied = true; // running it explicitly from Scan
+        $("[data-scan-status]").textContent =
+          `Found ${codes.length} — testing them now. Working ones move to Apply.`;
+        switchCardTab("apply");
+        autoApplyLoop();
+      }
+    } else {
+      $("[data-scan-status]").textContent = codes.length
+        ? `Found ${codes.length} code${codes.length > 1 ? "s" : ""} for ${domain}.` +
+          (domain !== here ? " Shared to the pool — tested when someone's on that store." : "")
+        : `No codes found for ${domain} yet.`;
+    }
   }
 
   // -- Add tab ----------------------------------------------------------------
